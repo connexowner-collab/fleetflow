@@ -1,3 +1,5 @@
 .claude/
 .env.local
 .env*.local
+web_app/public/sw.js
+web_app/public/workbox-*.js
