@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  
+  /* Gestão de Frota Segura theme variables */
+  /* This would normally be fetched via an API or Edge Config based on Tenant ID. */
+  --brand-primary: #0056B3;
+  --brand-primary-hover: #004494;
+  --brand-secondary: #6AB023;
+  --brand-secondary-hover: #58921D;
+  --sidebar-bg: #002D5B;
+  --sidebar-fg: #FFFFFF;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-primary-hover: var(--brand-primary-hover);
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-fg: var(--sidebar-fg);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
