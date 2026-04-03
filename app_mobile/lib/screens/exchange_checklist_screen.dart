@@ -145,7 +145,7 @@ class _ExchangeChecklistScreenState extends State<ExchangeChecklistScreen> {
             title: Text(key, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             value: items[key]!,
             onChanged: (val) => setState(() => items[key] = val),
-            activeColor: const Color(0xFF0F5AC4),
+            activeThumbColor: const Color(0xFF0F5AC4),
           );
         }).toList(),
       ),

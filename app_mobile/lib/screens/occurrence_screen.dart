@@ -125,7 +125,7 @@ class _OccurrenceScreenState extends State<OccurrenceScreen> {
               onTap: () => setState(() => _selectedCategory = cat['name']),
               child: Container(
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF0F5AC4).withOpacity(0.1) : Colors.white,
+                  color: isSelected ? const Color(0xFF0F5AC4).withValues(alpha:0.1) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: isSelected ? const Color(0xFF0F5AC4) : Colors.grey.shade200, width: 2),
                 ),

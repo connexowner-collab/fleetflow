@@ -165,7 +165,7 @@ class HomeScreen extends StatelessWidget {
                   onTap: () => _showPhotoUploadDialog(context),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha:0.2),
                       shape: BoxShape.circle,
                     ),
                     child: ClipOval(
@@ -195,14 +195,14 @@ class HomeScreen extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 20, offset: const Offset(0, 10))
+                BoxShadow(color: Colors.black.withValues(alpha:0.15), blurRadius: 20, offset: const Offset(0, 10))
               ],
             ),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: theme.primaryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(15)),
+                  decoration: BoxDecoration(color: theme.primaryColor.withValues(alpha:0.1), borderRadius: BorderRadius.circular(15)),
                   child: Icon(Icons.local_shipping, color: theme.primaryColor),
                 ),
                 const SizedBox(width: 16),
@@ -241,14 +241,14 @@ class HomeScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: const Color(0xFFF1F5F9)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))
+            BoxShadow(color: Colors.black.withValues(alpha:0.04), blurRadius: 10, offset: const Offset(0, 4))
           ],
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+              decoration: BoxDecoration(color: color.withValues(alpha:0.1), shape: BoxShape.circle),
               child: Icon(icon, size: 26, color: color),
             ),
             const SizedBox(width: 20),
@@ -313,7 +313,7 @@ class HomeScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF0056B3).withOpacity(0.1),
+              color: const Color(0xFF0056B3).withValues(alpha:0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: const Color(0xFF0056B3), size: 30),
