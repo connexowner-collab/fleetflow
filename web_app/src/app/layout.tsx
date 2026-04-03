@@ -17,16 +17,20 @@ export const metadata: Metadata = {
   title: 'FleetFlow - Gestão de Frotas',
   description: 'Sistema Inteligente de Gestão de Frotas e Ocorrências',
   applicationName: 'FleetFlow',
+  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'FleetFlow',
   },
   formatDetection: { telephone: false },
+  icons: {
+    apple: '/icons/icon-192x192.png',
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#3b82f6',
+  themeColor: '#0056B3',
   width: 'device-width',
   initialScale: 1,
   minimumScale: 1,
@@ -40,6 +44,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
+      <head>
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="FleetFlow" />
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <link rel="manifest" href="/manifest.json" />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen w-screen overflow-hidden`}>
         <PWARegister />
         {children}
