@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/utils/supabase/client';
 
 export default function Login() {
   const router = useRouter();
@@ -10,6 +11,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState('');
 
   const validate = () => {
     const errs: Record<string, string> = {};
@@ -29,11 +31,39 @@ export default function Login() {
       return;
     }
     setErrors({});
+    setServerError('');
     setLoading(true);
-    // Simula autenticação (2s)
-    await new Promise((res) => setTimeout(res, 1500));
-    setLoading(false);
-    router.push('/');
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setServerError('E-mail ou senha incorretos. Verifique suas credenciais.');
+        return;
+      }
+      router.push('/');
+      router.refresh();
+    } catch {
+      setServerError('Erro ao conectar ao servidor. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setErrors({ email: 'Informe o e-mail para recuperar a senha.' });
+      return;
+    }
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      alert('E-mail de recuperação enviado! Verifique sua caixa de entrada.');
+    } catch {
+      alert('Erro ao enviar e-mail de recuperação. Tente novamente.');
+    }
   };
 
   return (
@@ -51,10 +81,16 @@ export default function Login() {
             <p className="mt-2 text-sm text-gray-600">Acesse sua frota, relatórios e ocorrências.</p>
           </div>
 
+          {serverError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm" role="alert">
+              {serverError}
+            </div>
+          )}
+
           <form className="mt-8 space-y-6" onSubmit={handleSubmit} noValidate>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Tenant (Cliente/Empresa)</label>
+                <label className="block text-sm font-medium text-gray-700" htmlFor="tenant">Tenant (Cliente/Empresa)</label>
                 <input
                   id="tenant"
                   type="text"
@@ -62,11 +98,12 @@ export default function Login() {
                   onChange={(e) => setTenant(e.target.value)}
                   className={`mt-1 block w-full px-4 py-3 border rounded-lg shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm transition-all outline-none ${errors.tenant ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                   placeholder="ex: viacargas"
+                  aria-describedby={errors.tenant ? 'tenant-error' : undefined}
                 />
-                {errors.tenant && <p className="mt-1 text-xs text-red-600">{errors.tenant}</p>}
+                {errors.tenant && <p id="tenant-error" className="mt-1 text-xs text-red-600" role="alert">{errors.tenant}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">E-mail Corporativo</label>
+                <label className="block text-sm font-medium text-gray-700" htmlFor="email">E-mail Corporativo</label>
                 <input
                   id="email"
                   type="email"
@@ -74,11 +111,12 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   className={`mt-1 block w-full px-4 py-3 border rounded-lg shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm transition-all outline-none ${errors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                   placeholder="gestor@empresa.com.br"
+                  aria-describedby={errors.email ? 'email-error' : undefined}
                 />
-                {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
+                {errors.email && <p id="email-error" className="mt-1 text-xs text-red-600" role="alert">{errors.email}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Senha</label>
+                <label className="block text-sm font-medium text-gray-700" htmlFor="password">Senha</label>
                 <input
                   id="password"
                   type="password"
@@ -86,8 +124,9 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   className={`mt-1 block w-full px-4 py-3 border rounded-lg shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm transition-all outline-none ${errors.password ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                   placeholder="••••••••"
+                  aria-describedby={errors.password ? 'password-error' : undefined}
                 />
-                {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password}</p>}
+                {errors.password && <p id="password-error" className="mt-1 text-xs text-red-600" role="alert">{errors.password}</p>}
               </div>
             </div>
 
@@ -99,7 +138,7 @@ export default function Login() {
               <div className="text-sm">
                 <button
                   type="button"
-                  onClick={() => alert('Recuperação de senha: entre em contato com seu administrador.')}
+                  onClick={handleForgotPassword}
                   className="font-medium text-brand-primary hover:text-brand-primary/80"
                 >
                   Esqueceu a senha?

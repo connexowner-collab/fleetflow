@@ -37,12 +37,10 @@ export async function updateSession(request: NextRequest) {
   // Proteger rotas (ex: redirecionar para /login se não estiver logado e estiver acessando dashboard)
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/landing')
   
-  if (!user && !isAuthRoute && request.nextUrl.pathname !== '/') {
-    // Caso queira que a raiz '/' seja pública remova da condição, caso contrário:
-    // Redireciona o usuário para login se tentar acessar algo interno
-    // const url = request.nextUrl.clone()
-    // url.pathname = '/login'
-    // return NextResponse.redirect(url)
+  if (!user && !isAuthRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    return NextResponse.redirect(url);
   }
 
   return supabaseResponse
