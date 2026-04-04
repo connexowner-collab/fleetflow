@@ -1,53 +1,81 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, MoreVertical, Key, ShieldCheck, Mail, Building, Smartphone, Monitor, X, Check, Globe, LayoutDashboard } from 'lucide-react';
+
+type UserRow = {
+  id: string;
+  nome: string;
+  email: string;
+  perfil: string;
+  ativo: boolean;
+  tenant_id: string;
+  tenants: { nome: string } | null;
+};
+
+const perfilLabel: Record<string, string> = {
+  motorista: 'Motorista',
+  analista: 'Analista de Frota',
+  gestor: 'Gestor',
+  diretor: 'Diretor',
+};
 
 export default function UsersManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [users, setUsers] = useState<{ id: number; name: string; role: string; tenant: string; email: string; status: string; access: string[] }[]>([]);
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // New user form state
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState('Motorista');
+  const [acesso, setAcesso] = useState<'app' | 'web' | 'ambos'>('app');
 
-  useEffect(() => {
-    fetch('/api/admin/users').then(r => r.json()).then(d => {
-      setUsers((d.users || []).map((u: { nome?: string; email?: string; cargo?: string; tenant_id?: string; status?: string }, i: number) => ({
-        id: i + 1,
-        name: u.nome || u.email,
-        role: u.cargo || 'Motorista',
-        tenant: u.tenant_id || '-',
-        email: u.email || '',
-        status: u.status || 'Ativo',
-        access: ['App'],
-      })));
-    }).catch(() => setUsers([]));
+  const loadUsers = useCallback(() => {
+    fetch('/api/admin/users').then(r => r.json()).then(d => setUsers(d.users || [])).catch(() => setUsers([]));
   }, []);
+
+  useEffect(() => { loadUsers(); }, [loadUsers]);
 
   const showToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => setToast(null), 4000);
   };
 
   const handleCreateUser = async () => {
+    if (!newName.trim() || !newEmail.trim()) {
+      showToast('⚠️ Preencha nome e e-mail.');
+      return;
+    }
+    setLoading(true);
     setIsModalOpen(false);
+
     const res = await fetch('/api/admin/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: newEmail, password: newPassword, nome: newName, cargo: newRole }),
+      body: JSON.stringify({ email: newEmail, nome: newName, cargo: newRole, acesso }),
     });
     const data = await res.json();
-    showToast(data.error ? `⚠️ ${data.error}` : '🚀 Convite enviado com sucesso!');
-    setNewName(''); setNewEmail(''); setNewPassword(''); setNewRole('Motorista');
+
+    if (data.error) {
+      showToast(`⚠️ ${data.error}`);
+    } else {
+      showToast(`✅ Acesso criado! Link de definição de senha enviado para ${newEmail}`);
+      loadUsers();
+    }
+
+    setNewName(''); setNewEmail(''); setNewRole('Motorista'); setAcesso('app');
+    setLoading(false);
   };
+
+  const filtered = users.filter(u =>
+    u.nome?.toLowerCase().includes(search.toLowerCase()) ||
+    u.email?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto relative pb-12">
-      {/* Toast */}
       {toast && (
         <div className="fixed top-6 right-6 z-[60] bg-gray-900 text-white px-6 py-4 rounded-2xl shadow-2xl text-sm font-bold animate-in slide-in-from-right flex items-center gap-3">
           <div className="w-2 h-2 bg-brand-secondary rounded-full animate-pulse" />
@@ -61,7 +89,7 @@ export default function UsersManagement() {
             <LayoutDashboard className="w-8 h-8 text-brand-primary" />
             Gestão de Acessos
           </h1>
-          <p className="text-gray-500 mt-2 font-medium">Controle rigoroso de quem pode acessar o dashboard e os fluxos do aplicativo mobile.</p>
+          <p className="text-gray-500 mt-2 font-medium">Controle de quem acessa o dashboard e o aplicativo mobile.</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
@@ -72,28 +100,17 @@ export default function UsersManagement() {
         </button>
       </div>
 
-      {/* Tabela de Usuários */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
           <div className="relative w-80 group">
             <Search className="w-5 h-5 absolute left-4 top-3 text-gray-400 group-hover:text-brand-primary transition-colors" />
             <input
               type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
               placeholder="Buscar por nome ou e-mail..."
               className="pl-12 pr-4 py-3 w-full border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none transition-all shadow-sm"
             />
-          </div>
-          <div className="flex gap-4">
-            <select className="border border-gray-300 text-sm rounded-xl px-4 py-3 text-gray-700 bg-white shadow-sm outline-none focus:ring-2 focus:ring-brand-primary/30 transition-all cursor-pointer">
-              <option>Todos os Clientes</option>
-              <option>ViaCargas</option>
-              <option>LogisticaPro</option>
-            </select>
-            <select className="border border-gray-300 text-sm rounded-xl px-4 py-3 text-gray-700 bg-white shadow-sm outline-none focus:ring-2 focus:ring-brand-primary/30 transition-all cursor-pointer">
-              <option>Todos os Perfis</option>
-              <option>Motorista</option>
-              <option>Gestor de Frotas</option>
-            </select>
           </div>
         </div>
 
@@ -102,67 +119,55 @@ export default function UsersManagement() {
             <thead className="bg-gray-50/70 text-gray-400 uppercase font-black text-[10px] tracking-widest">
               <tr>
                 <th className="px-8 py-5">Colaborador</th>
-                <th className="px-8 py-5">Tenant (Empresa)</th>
+                <th className="px-8 py-5">Empresa</th>
                 <th className="px-8 py-5">Perfil</th>
-                <th className="px-8 py-5">Liberação SaaS</th>
                 <th className="px-8 py-5 text-center">Status</th>
                 <th className="px-8 py-5 text-right">Controle</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
-              {users.map((u) => (
+              {filtered.length === 0 && (
+                <tr><td colSpan={5} className="text-center py-12 text-gray-400">Nenhum usuário encontrado</td></tr>
+              )}
+              {filtered.map((u) => (
                 <tr key={u.id} className="hover:bg-brand-primary/[0.02] transition-colors group">
                   <td className="px-8 py-5">
                     <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 rounded-2xl bg-brand-primary/10 flex items-center justify-center overflow-hidden border-2 border-white shadow-md group-hover:scale-105 transition-transform duration-300">
+                      <div className="w-12 h-12 rounded-2xl bg-brand-primary/10 flex items-center justify-center overflow-hidden border-2 border-white shadow-md">
                         <img
-                          src={u.id === 1
-                            ? "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop"
-                            : `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=0056B3&color=fff&bold=true`
-                          }
-                          alt={u.name}
+                          src={`https://ui-avatars.com/api/?name=${encodeURIComponent(u.nome || u.email)}&background=0056B3&color=fff&bold=true`}
+                          alt={u.nome}
                           className="w-full h-full object-cover"
                         />
                       </div>
                       <div>
-                        <p className="font-black text-gray-900 text-base">{u.name}</p>
-                        <p className="text-xs text-gray-400 flex items-center font-bold tracking-tight"><Mail className="w-3 h-3 mr-2" /> {u.email.toUpperCase()}</p>
+                        <p className="font-black text-gray-900 text-base">{u.nome || '-'}</p>
+                        <p className="text-xs text-gray-400 flex items-center font-bold tracking-tight">
+                          <Mail className="w-3 h-3 mr-2" /> {u.email}
+                        </p>
                       </div>
                     </div>
                   </td>
                   <td className="px-8 py-5">
                     <span className="flex items-center font-black text-gray-700 bg-gray-100 px-3 py-1.5 rounded-lg text-xs border border-gray-200">
-                      <Building className="w-3.5 h-3.5 mr-2 text-brand-primary/50" /> {u.tenant.toUpperCase()}
+                      <Building className="w-3.5 h-3.5 mr-2 text-brand-primary/50" />
+                      {u.tenants?.nome ?? u.tenant_id?.slice(0, 8) ?? '-'}
                     </span>
                   </td>
                   <td className="px-8 py-5">
-                    <span className="flex items-center font-bold text-gray-800"><ShieldCheck className="w-4 h-4 mr-2 text-brand-primary" /> {u.role}</span>
-                  </td>
-                  <td className="px-8 py-5">
-                    <div className="flex flex-wrap gap-2">
-                      {u.access.includes('App') && (
-                        <span className="px-2.5 py-1 bg-blue-50 text-brand-primary rounded-lg text-[10px] font-black flex items-center shadow-sm border border-blue-100 uppercase" title="Acesso ao App Mobile">
-                          <Smartphone className="w-3.5 h-3.5 mr-1"/> Mobile
-                        </span>
-                      )}
-                      {u.access.includes('Web') && (
-                        <span className="px-2.5 py-1 bg-gray-50 text-gray-600 rounded-lg text-[10px] font-black flex items-center shadow-sm border border-gray-200 uppercase" title="Acesso ao Painel Web">
-                          <Globe className="w-3.5 h-3.5 mr-1"/> SaaS
-                        </span>
-                      )}
-                    </div>
+                    <span className="flex items-center font-bold text-gray-800">
+                      <ShieldCheck className="w-4 h-4 mr-2 text-brand-primary" />
+                      {perfilLabel[u.perfil] ?? u.perfil}
+                    </span>
                   </td>
                   <td className="px-8 py-5 text-center">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${u.status === 'Ativo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {u.status}
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${u.ativo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {u.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
                   <td className="px-8 py-5 text-right">
                     <div className="flex items-center justify-end space-x-2 opacity-30 group-hover:opacity-100 transition-opacity">
-                      <button className="text-gray-400 hover:text-brand-primary p-2.5 rounded-xl hover:bg-brand-primary/10 transition-all" title="Zerar Senha">
-                        <Key className="w-4 h-4" />
-                      </button>
-                      <button className="text-gray-400 hover:text-gray-900 p-2.5 rounded-xl hover:bg-gray-100 transition-all">
+                      <button className="text-gray-400 hover:text-brand-primary p-2.5 rounded-xl hover:bg-brand-primary/10 transition-all" title="Opções">
                         <MoreVertical className="w-4 h-4" />
                       </button>
                     </div>
@@ -174,134 +179,90 @@ export default function UsersManagement() {
         </div>
       </div>
 
-      {/* Slide-over de Criação de Acesso */}
+      {/* Modal Criar Acesso */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-opacity opacity-100 animate-in fade-in" onClick={() => setIsModalOpen(false)}></div>
+        <div className="fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-md animate-in fade-in" onClick={() => setIsModalOpen(false)} />
           <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
-            <div className="pointer-events-auto w-screen max-w-md transform transition-transform animate-in slide-in-from-right duration-500 shadow-2xl">
+            <div className="pointer-events-auto w-screen max-w-md animate-in slide-in-from-right duration-500 shadow-2xl">
               <div className="flex h-full flex-col bg-white overflow-hidden">
 
-                <div className="bg-gray-50 px-8 py-10 border-b border-gray-100 flex items-center justify-between relative overflow-hidden shrink-0">
-                  <div className="absolute -top-10 -right-10 w-40 h-40 bg-brand-primary opacity-10 rounded-full blur-3xl pointer-events-none" />
+                <div className="bg-gray-50 px-8 py-10 border-b border-gray-100 flex items-center justify-between shrink-0">
                   <div>
-                    <h2 className="text-2xl font-black text-gray-900 tracking-tight" id="slide-over-title">Convidar Integrante</h2>
-                    <p className="text-sm text-gray-500 font-bold mt-1 uppercase tracking-widest opacity-60">Habilitação de acessos</p>
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Novo Acesso</h2>
+                    <p className="text-sm text-gray-500 font-bold mt-1 uppercase tracking-widest opacity-60">O usuário receberá a senha por e-mail</p>
                   </div>
-                  <button onClick={() => setIsModalOpen(false)} className="rounded-xl bg-white text-gray-400 hover:text-gray-700 focus:outline-none p-2 border border-gray-200 shadow-sm transition-all hover:bg-gray-50 z-10">
+                  <button onClick={() => setIsModalOpen(false)} className="rounded-xl bg-white text-gray-400 hover:text-gray-700 p-2 border border-gray-200 shadow-sm transition-all z-10">
                     <X className="h-6 w-6" />
                   </button>
                 </div>
 
-                <div className="relative flex-1 px-8 py-8 space-y-8 flex flex-col justify-start overflow-y-auto">
+                <div className="flex-1 px-8 py-8 space-y-6 overflow-y-auto">
 
                   <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Nome e Sobrenome</label>
-                    <input
-                      type="text"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      className="w-full rounded-2xl border border-gray-300 px-5 py-4 outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary text-gray-900 font-bold transition-all"
-                      placeholder="Nome do usuário..."
-                    />
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Nome Completo</label>
+                    <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
+                      className="w-full rounded-2xl border border-gray-300 px-5 py-4 outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary text-gray-900 font-bold"
+                      placeholder="Nome do usuário..." />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">E-mail Corporativo (Login)</label>
-                    <input
-                      type="email"
-                      value={newEmail}
-                      onChange={(e) => setNewEmail(e.target.value)}
-                      className="w-full rounded-2xl border border-gray-300 px-5 py-4 outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary text-gray-900 font-bold transition-all shadow-sm"
-                      placeholder="exemplo@empresa.com.br"
-                    />
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">E-mail (Login)</label>
+                    <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)}
+                      className="w-full rounded-2xl border border-gray-300 px-5 py-4 outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary text-gray-900 font-bold shadow-sm"
+                      placeholder="exemplo@empresa.com.br" />
+                    <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                      <Mail className="w-3 h-3" /> O link para definir a senha será enviado automaticamente para este e-mail.
+                    </p>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Senha Inicial</label>
-                    <input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full rounded-2xl border border-gray-300 px-5 py-4 outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary text-gray-900 font-bold transition-all shadow-sm"
-                      placeholder="Senha temporária..."
-                    />
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Perfil</label>
+                    <select value={newRole} onChange={e => setNewRole(e.target.value)}
+                      className="w-full rounded-2xl border border-gray-300 px-4 py-4 outline-none focus:ring-2 focus:ring-brand-primary/30 bg-white font-bold text-gray-900">
+                      <option>Motorista</option>
+                      <option>Analista de Frota</option>
+                      <option>Gestor</option>
+                      <option>Diretor</option>
+                    </select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Perfil da Conta</label>
-                      <select
-                        value={newRole}
-                        onChange={(e) => setNewRole(e.target.value)}
-                        className="w-full rounded-2xl border border-gray-300 px-4 py-4 outline-none focus:ring-2 focus:ring-brand-primary/30 bg-white font-bold text-gray-900 cursor-pointer"
-                      >
-                        <option>Motorista</option>
-                        <option>Analista de Frota</option>
-                        <option>Gestor</option>
-                        <option>Diretor</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Ativos Vinculados</label>
-                      <select className="w-full rounded-2xl border border-gray-300 px-4 py-4 outline-none focus:ring-2 focus:ring-brand-primary/30 bg-white font-bold text-gray-900 cursor-pointer">
-                        <option value="">Nenhum</option>
-                        <option>Volvo ABC-1234</option>
-                        <option>Scania XYZ-9876</option>
-                        <option>Carreta DEF-5555</option>
-                      </select>
+                  <div className="pt-4 border-t border-gray-100">
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Acesso à Plataforma</label>
+                    <div className="space-y-3">
+                      {[
+                        { value: 'app', icon: <Smartphone className="w-5 h-5 mr-3 text-brand-primary" />, label: 'App Mobile', desc: 'Checklists, KM e ocorrências.' },
+                        { value: 'web', icon: <Monitor className="w-5 h-5 mr-3 text-gray-400" />, label: 'Painel Web', desc: 'Dashboard, relatórios e gestão.' },
+                        { value: 'ambos', icon: <Globe className="w-5 h-5 mr-3 text-green-500" />, label: 'App + Painel Web', desc: 'Acesso completo.' },
+                      ].map(opt => (
+                        <label key={opt.value} className={`flex items-start p-4 border-2 rounded-2xl cursor-pointer transition-colors ${acesso === opt.value ? 'border-brand-primary bg-brand-primary/5' : 'border-gray-200 hover:bg-gray-50'}`}>
+                          <input type="radio" name="acesso" value={opt.value} checked={acesso === opt.value} onChange={() => setAcesso(opt.value as typeof acesso)} className="mt-1 mr-4 text-brand-primary" />
+                          <div>
+                            <span className="font-black text-gray-900 flex items-center">{opt.icon}{opt.label}</span>
+                            <span className="text-xs text-gray-500 mt-1 block">{opt.desc}</span>
+                          </div>
+                        </label>
+                      ))}
                     </div>
                   </div>
-
-                  {/* Seletores de Liberação Dinâmica */}
-                  <div className="pt-8 mt-4 border-t border-gray-100">
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-6">Permissionamento de Plataforma</label>
-
-                    <div className="space-y-4">
-                      <label className="flex items-start p-5 border-2 border-brand-primary bg-brand-primary/5 rounded-2xl cursor-pointer hover:bg-brand-primary/10 transition-colors shadow-sm shadow-brand-primary/10">
-                        <div className="flex items-center h-6 mt-0.5">
-                          <input type="checkbox" defaultChecked className="w-5 h-5 text-brand-primary border-gray-300 rounded focus:ring-brand-primary cursor-pointer" />
-                        </div>
-                        <div className="ml-4 flex flex-col">
-                          <span className="text-lg font-black text-gray-900 flex items-center leading-none">
-                            <Smartphone className="w-5 h-5 mr-3 text-brand-primary" /> App Mobile Motorista
-                          </span>
-                          <span className="text-sm text-gray-500 mt-2 leading-relaxed font-medium italic opacity-70">Lançamento de KM, checklists diários e registros de fotos de avarias.</span>
-                        </div>
-                      </label>
-
-                      <label className="flex items-start p-5 border border-gray-200 rounded-2xl cursor-pointer hover:bg-gray-50 transition-colors">
-                        <div className="flex items-center h-6 mt-0.5">
-                          <input type="checkbox" className="w-5 h-5 text-brand-primary border-gray-300 rounded focus:ring-brand-primary cursor-pointer" />
-                        </div>
-                        <div className="ml-4 flex flex-col">
-                          <span className="text-lg font-black text-gray-900 flex items-center leading-none">
-                            <Monitor className="w-5 h-5 mr-3 text-gray-400" /> Painel de Gestão SaaS
-                          </span>
-                          <span className="text-sm text-gray-500 mt-2 leading-relaxed font-medium italic opacity-70">Acesso administrativo para auditoria, relatórios e gestão de recursos.</span>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-
                 </div>
 
-                {/* Footer Actions */}
-                <div className="border-t border-gray-100 px-8 py-6 bg-white flex justify-end gap-4 shadow-[0_-15px_35px_-5px_rgba(0,0,0,0.05)] shrink-0">
+                <div className="border-t border-gray-100 px-8 py-6 bg-white flex gap-4 shrink-0">
                   <button onClick={() => setIsModalOpen(false)} className="flex-1 px-6 py-4 text-xs font-black text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-2xl transition-all uppercase tracking-widest">
                     Cancelar
                   </button>
-                  <button onClick={handleCreateUser} className="flex-[2] px-8 py-4 text-xs font-black text-white bg-brand-primary border border-transparent rounded-2xl shadow-xl shadow-brand-primary/20 hover:bg-brand-primary/90 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center uppercase tracking-widest gap-3">
+                  <button onClick={handleCreateUser} disabled={loading}
+                    className="flex-[2] px-8 py-4 text-xs font-black text-white bg-brand-primary rounded-2xl shadow-xl shadow-brand-primary/20 hover:bg-brand-primary/90 transition-all flex items-center justify-center uppercase tracking-widest gap-3 disabled:opacity-50">
                     <Check className="w-5 h-5" />
-                    Criar Cadastro e Notificar
+                    {loading ? 'Criando...' : 'Criar e Enviar por E-mail'}
                   </button>
                 </div>
+
               </div>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }
