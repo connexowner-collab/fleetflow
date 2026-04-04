@@ -73,10 +73,12 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   Future<void> _loadSupabaseData() async {
     final svc = SupabaseService();
 
-    // Carrega perfil do usuário (tenant_id + nome)
+    // Carrega perfil do usuário (tenant_id + nome + veículo vinculado)
     final profile = await svc.getProfile();
+    String? placaVinculada;
     if (profile != null && mounted) {
       _tenantId = profile['tenant_id'] as String?;
+      placaVinculada = profile['placa_vinculada'] as String?;
       if ((profile['nome'] as String?)?.isNotEmpty == true) {
         setState(() => _nomeCtrl.text = profile['nome'] as String);
       }
@@ -88,27 +90,33 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     if (mounted) {
       setState(() {
         if (opcoes['unidades']!.isNotEmpty) {
-          _data.unidades
-            ..clear()
-            ..addAll(opcoes['unidades']!);
+          _data.unidades..clear()..addAll(opcoes['unidades']!);
         }
         if (opcoes['setores']!.isNotEmpty) {
-          _data.setores
-            ..clear()
-            ..addAll(opcoes['setores']!);
+          _data.setores..clear()..addAll(opcoes['setores']!);
         }
         if (opcoes['areas']!.isNotEmpty) {
-          _data.areas
-            ..clear()
-            ..addAll(opcoes['areas']!);
+          _data.areas..clear()..addAll(opcoes['areas']!);
         }
         if (veiculos.isNotEmpty) {
-          _data.veiculos
-            ..clear()
-            ..addAll(veiculos);
+          _data.veiculos..clear()..addAll(veiculos);
         }
         if (opcoes['itens_inspecao']!.isNotEmpty) {
           _itens = { for (final item in opcoes['itens_inspecao']!) item: true };
+        }
+
+        // Pré-selecionar veículo vinculado ao usuário
+        if (placaVinculada != null && placaVinculada.isNotEmpty) {
+          // Preenche a placa no step 1
+          _placaCtrl.text = placaVinculada;
+          // Pré-seleciona o veículo no dropdown (busca pelo que contém a placa)
+          final veiculoVinculado = _data.veiculos.firstWhere(
+            (v) => v.toUpperCase().contains(placaVinculada!.toUpperCase()),
+            orElse: () => '',
+          );
+          if (veiculoVinculado.isNotEmpty) {
+            _veiculo = veiculoVinculado;
+          }
         }
       });
     }

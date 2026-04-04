@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, ShieldCheck, Mail, Building, Smartphone, Monitor, X, Check, Globe, LayoutDashboard, Pencil, Trash2, Power } from 'lucide-react';
+import { Plus, Search, ShieldCheck, Mail, Building, Smartphone, Monitor, X, Check, Globe, LayoutDashboard, Pencil, Trash2, Power, Truck } from 'lucide-react';
+
+type Veiculo = { id: string; placa: string; modelo: string; status: string };
 
 type UserRow = {
   id: string;
@@ -10,8 +12,10 @@ type UserRow = {
   perfil: string;
   ativo: boolean;
   telas_permitidas: string[];
+  veiculo_id: string | null;
   tenant_id: string;
   tenants: { nome: string } | null;
+  veiculos: { id: string; placa: string; modelo: string } | null;
 };
 
 const perfilLabel: Record<string, string> = {
@@ -28,14 +32,9 @@ const TELAS = [
   { id: 'historico', label: 'Meu Histórico', desc: 'Consultar laudos passados', icon: '📜' },
 ];
 
-const ACESSOS = [
-  { value: 'app', icon: <Smartphone className="w-4 h-4 mr-2 text-brand-primary" />, label: 'App Mobile', desc: 'Checklists, KM e ocorrências.' },
-  { value: 'web', icon: <Monitor className="w-4 h-4 mr-2 text-gray-400" />, label: 'Painel Web', desc: 'Dashboard, relatórios e gestão.' },
-  { value: 'ambos', icon: <Globe className="w-4 h-4 mr-2 text-green-500" />, label: 'App + Painel Web', desc: 'Acesso completo.' },
-];
-
 export default function UsersManagement() {
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -51,11 +50,13 @@ export default function UsersManagement() {
   const [newRole, setNewRole] = useState('Motorista');
   const [newAcesso, setNewAcesso] = useState('app');
   const [newTelas, setNewTelas] = useState<string[]>(['checklist', 'troca', 'ocorrencia', 'historico']);
+  const [newVeiculoId, setNewVeiculoId] = useState('');
 
   // Form editar
   const [editNome, setEditNome] = useState('');
   const [editRole, setEditRole] = useState('Motorista');
   const [editTelas, setEditTelas] = useState<string[]>([]);
+  const [editVeiculoId, setEditVeiculoId] = useState('');
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
 
@@ -63,25 +64,37 @@ export default function UsersManagement() {
     fetch('/api/admin/users').then(r => r.json()).then(d => setUsers(d.users || [])).catch(() => setUsers([]));
   }, []);
 
-  useEffect(() => { loadUsers(); }, [loadUsers]);
+  useEffect(() => {
+    loadUsers();
+    fetch('/api/admin/veiculos').then(r => r.json()).then(d => setVeiculos(d.veiculos || [])).catch(() => {});
+  }, [loadUsers]);
 
   const toggleTela = (tela: string, list: string[], setList: (v: string[]) => void) => {
     setList(list.includes(tela) ? list.filter(t => t !== tela) : [...list, tela]);
   };
 
+  const veiculoLabel = (v: Veiculo) => `${v.modelo} (${v.placa})`;
+
   // Criar
   const handleCriar = async () => {
     if (!newName.trim() || !newEmail.trim()) { showToast('⚠️ Preencha nome e e-mail.'); return; }
     setLoading(true); setModalCriar(false);
+    const veiculo = veiculos.find(v => v.id === newVeiculoId);
     const res = await fetch('/api/admin/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: newEmail, nome: newName, cargo: newRole, acesso: newAcesso, telas: newTelas }),
+      body: JSON.stringify({
+        email: newEmail, nome: newName, cargo: newRole,
+        acesso: newAcesso, telas: newTelas,
+        veiculo_id: newVeiculoId || null,
+        placa: veiculo?.placa || null,
+      }),
     });
     const data = await res.json();
     showToast(data.error ? `⚠️ ${data.error}` : `✅ Convite enviado para ${newEmail}`);
     if (!data.error) loadUsers();
-    setNewName(''); setNewEmail(''); setNewRole('Motorista'); setNewAcesso('app'); setNewTelas(['checklist', 'troca', 'ocorrencia', 'historico']);
+    setNewName(''); setNewEmail(''); setNewRole('Motorista'); setNewAcesso('app');
+    setNewTelas(['checklist', 'troca', 'ocorrencia', 'historico']); setNewVeiculoId('');
     setLoading(false);
   };
 
@@ -89,15 +102,22 @@ export default function UsersManagement() {
   const openEditar = (u: UserRow) => {
     setEditNome(u.nome); setEditRole(perfilLabel[u.perfil] ?? 'Motorista');
     setEditTelas(u.telas_permitidas ?? ['checklist', 'troca', 'ocorrencia', 'historico']);
+    setEditVeiculoId(u.veiculo_id ?? '');
     setModalEditar(u);
   };
   const handleEditar = async () => {
     if (!modalEditar) return;
     setLoading(true); setModalEditar(null);
+    const veiculo = veiculos.find(v => v.id === editVeiculoId);
     const res = await fetch(`/api/admin/users/${modalEditar.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nome: editNome, cargo: editRole, telas_permitidas: editTelas }),
+      body: JSON.stringify({
+        nome: editNome, cargo: editRole,
+        telas_permitidas: editTelas,
+        veiculo_id: editVeiculoId || null,
+        placa: veiculo?.placa || null,
+      }),
     });
     const data = await res.json();
     showToast(data.error ? `⚠️ ${data.error}` : '✅ Usuário atualizado!');
@@ -131,6 +151,49 @@ export default function UsersManagement() {
   const filtered = users.filter(u =>
     u.nome?.toLowerCase().includes(search.toLowerCase()) ||
     u.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // Componente de seleção de veículo reutilizável
+  const VeiculoSelect = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <div>
+      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+        <Truck className="w-3.5 h-3.5" /> Veículo Vinculado
+      </label>
+      <select value={value} onChange={e => onChange(e.target.value)}
+        className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary/30 bg-white font-bold text-gray-900">
+        <option value="">— Nenhum veículo vinculado —</option>
+        {veiculos.map(v => (
+          <option key={v.id} value={v.id}>
+            {veiculoLabel(v)} {v.status !== 'Disponível' ? `· ${v.status}` : ''}
+          </option>
+        ))}
+      </select>
+      {value && (
+        <p className="text-xs text-brand-primary mt-1.5 font-bold flex items-center gap-1">
+          <Truck className="w-3 h-3" />
+          Todas as ações no app usarão este ativo automaticamente.
+        </p>
+      )}
+    </div>
+  );
+
+  // Componente de telas
+  const TelasList = ({ list, setList }: { list: string[]; setList: (v: string[]) => void }) => (
+    <div>
+      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Telas Visíveis no App</label>
+      <div className="space-y-2">
+        {TELAS.map(t => (
+          <label key={t.id} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${list.includes(t.id) ? 'border-brand-primary bg-brand-primary/5' : 'border-gray-200 hover:bg-gray-50'}`}>
+            <input type="checkbox" checked={list.includes(t.id)} onChange={() => toggleTela(t.id, list, setList)} className="w-4 h-4 text-brand-primary rounded" />
+            <span className="text-lg">{t.icon}</span>
+            <div>
+              <span className="font-black text-gray-900 text-sm">{t.label}</span>
+              <span className="block text-xs text-gray-400">{t.desc}</span>
+            </div>
+          </label>
+        ))}
+      </div>
+    </div>
   );
 
   return (
@@ -172,6 +235,7 @@ export default function UsersManagement() {
                 <th className="px-6 py-4">Colaborador</th>
                 <th className="px-6 py-4">Empresa</th>
                 <th className="px-6 py-4">Perfil</th>
+                <th className="px-6 py-4">Veículo</th>
                 <th className="px-6 py-4">Telas App</th>
                 <th className="px-6 py-4 text-center">Status</th>
                 <th className="px-6 py-4 text-right">Ações</th>
@@ -179,7 +243,7 @@ export default function UsersManagement() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="text-center py-12 text-gray-400">Nenhum usuário encontrado</td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-gray-400">Nenhum usuário encontrado</td></tr>
               )}
               {filtered.map(u => (
                 <tr key={u.id} className="hover:bg-gray-50/50 transition-colors group">
@@ -204,12 +268,22 @@ export default function UsersManagement() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
+                    {u.veiculos ? (
+                      <span className="flex items-center gap-1.5 font-bold text-gray-700 bg-blue-50 px-2.5 py-1 rounded-lg text-xs border border-blue-100">
+                        <Truck className="w-3 h-3 text-brand-primary" />
+                        {u.veiculos.modelo} · {u.veiculos.placa}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1">
                       {(u.telas_permitidas ?? []).map(t => {
                         const tela = TELAS.find(x => x.id === t);
                         return tela ? (
                           <span key={t} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-100 px-1.5 py-0.5 rounded font-bold">
-                            {tela.icon} {tela.label.split(' ')[0]}
+                            {tela.icon}
                           </span>
                         ) : null;
                       })}
@@ -280,33 +354,23 @@ export default function UsersManagement() {
                       <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Plataforma</label>
                       <select value={newAcesso} onChange={e => setNewAcesso(e.target.value)}
                         className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none bg-white font-bold text-gray-900">
-                        {ACESSOS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+                        <option value="app"><Smartphone className="w-3 h-3" /> App Mobile</option>
+                        <option value="web">Painel Web</option>
+                        <option value="ambos">App + Painel Web</option>
                       </select>
                     </div>
                   </div>
 
+                  <VeiculoSelect value={newVeiculoId} onChange={setNewVeiculoId} />
+
                   {(newAcesso === 'app' || newAcesso === 'ambos') && (
-                    <div>
-                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Telas Visíveis no App</label>
-                      <div className="space-y-2">
-                        {TELAS.map(t => (
-                          <label key={t.id} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${newTelas.includes(t.id) ? 'border-brand-primary bg-brand-primary/5' : 'border-gray-200 hover:bg-gray-50'}`}>
-                            <input type="checkbox" checked={newTelas.includes(t.id)} onChange={() => toggleTela(t.id, newTelas, setNewTelas)} className="w-4 h-4 text-brand-primary rounded" />
-                            <span className="text-lg">{t.icon}</span>
-                            <div>
-                              <span className="font-black text-gray-900 text-sm">{t.label}</span>
-                              <span className="block text-xs text-gray-400">{t.desc}</span>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
+                    <TelasList list={newTelas} setList={setNewTelas} />
                   )}
                 </div>
                 <div className="border-t px-8 py-5 flex gap-3 shrink-0">
                   <button onClick={() => setModalCriar(false)} className="flex-1 py-3 text-xs font-black text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-xl uppercase tracking-widest">Cancelar</button>
                   <button onClick={handleCriar} disabled={loading} className="flex-[2] py-3 text-xs font-black text-white bg-brand-primary rounded-xl hover:bg-brand-primary/90 transition-all flex items-center justify-center gap-2 uppercase tracking-widest disabled:opacity-50">
-                    <Check className="w-4 h-4" />Criar e Enviar Convite
+                    <Check className="w-4 h-4" />{loading ? 'Criando...' : 'Criar e Enviar Convite'}
                   </button>
                 </div>
               </div>
@@ -342,21 +406,10 @@ export default function UsersManagement() {
                       <option>Motorista</option><option>Analista de Frota</option><option>Gestor</option><option>Diretor</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Telas Visíveis no App</label>
-                    <div className="space-y-2">
-                      {TELAS.map(t => (
-                        <label key={t.id} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${editTelas.includes(t.id) ? 'border-brand-primary bg-brand-primary/5' : 'border-gray-200 hover:bg-gray-50'}`}>
-                          <input type="checkbox" checked={editTelas.includes(t.id)} onChange={() => toggleTela(t.id, editTelas, setEditTelas)} className="w-4 h-4 text-brand-primary rounded" />
-                          <span className="text-lg">{t.icon}</span>
-                          <div>
-                            <span className="font-black text-gray-900 text-sm">{t.label}</span>
-                            <span className="block text-xs text-gray-400">{t.desc}</span>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
+
+                  <VeiculoSelect value={editVeiculoId} onChange={setEditVeiculoId} />
+
+                  <TelasList list={editTelas} setList={setEditTelas} />
                 </div>
                 <div className="border-t px-8 py-5 flex gap-3 shrink-0">
                   <button onClick={() => setModalEditar(null)} className="flex-1 py-3 text-xs font-black text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-xl uppercase tracking-widest">Cancelar</button>
@@ -384,8 +437,8 @@ export default function UsersManagement() {
                 Tem certeza que deseja excluir <strong>{modalDeletar.nome}</strong>? Esta ação não pode ser desfeita.
               </p>
               <div className="flex gap-3">
-                <button onClick={() => setModalDeletar(null)} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-black text-sm rounded-xl transition-all">Cancelar</button>
-                <button onClick={handleDeletar} className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-black text-sm rounded-xl transition-all">Excluir</button>
+                <button onClick={() => setModalDeletar(null)} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-black text-sm rounded-xl">Cancelar</button>
+                <button onClick={handleDeletar} className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-black text-sm rounded-xl">Excluir</button>
               </div>
             </div>
           </div>
