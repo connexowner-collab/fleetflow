@@ -201,8 +201,9 @@ CREATE OR REPLACE TRIGGER trg_troca_codigo
   FOR EACH ROW EXECUTE FUNCTION set_troca_codigo();
 
 -- ── Trigger: criar profile ao registrar usuário ───────────
-CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public AS $$
 BEGIN
   INSERT INTO public.profiles (id, tenant_id, nome, email, perfil)
   VALUES (
@@ -218,7 +219,7 @@ $$;
 
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ── Trigger: atualizar km do veículo ao criar checklist ───
 CREATE OR REPLACE FUNCTION update_veiculo_km()
@@ -273,118 +274,120 @@ ALTER TABLE public.checklist_fotos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ocorrencias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.trocas ENABLE ROW LEVEL SECURITY;
 
--- Função helper: retorna tenant_id do usuário logado
-CREATE OR REPLACE FUNCTION auth.tenant_id()
-RETURNS UUID LANGUAGE sql STABLE AS $$
+-- Função helper: retorna tenant_id do usuário logado (em public, não auth)
+CREATE OR REPLACE FUNCTION public.get_tenant_id()
+RETURNS UUID LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public AS $$
   SELECT tenant_id FROM public.profiles WHERE id = auth.uid()
 $$;
 
--- Função helper: retorna perfil do usuário logado
-CREATE OR REPLACE FUNCTION auth.user_perfil()
-RETURNS TEXT LANGUAGE sql STABLE AS $$
+-- Função helper: retorna perfil do usuário logado (em public, não auth)
+CREATE OR REPLACE FUNCTION public.get_user_perfil()
+RETURNS TEXT LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public AS $$
   SELECT perfil FROM public.profiles WHERE id = auth.uid()
 $$;
 
 -- tenants: apenas admins veem o próprio tenant
 CREATE POLICY "tenant_select" ON public.tenants
-  FOR SELECT USING (id = auth.tenant_id());
+  FOR SELECT USING (id = public.get_tenant_id());
 
 -- profiles: vê todos do mesmo tenant
 CREATE POLICY "profiles_select" ON public.profiles
-  FOR SELECT USING (tenant_id = auth.tenant_id());
+  FOR SELECT USING (tenant_id = public.get_tenant_id());
 
 CREATE POLICY "profiles_insert" ON public.profiles
-  FOR INSERT WITH CHECK (tenant_id = auth.tenant_id());
+  FOR INSERT WITH CHECK (tenant_id = public.get_tenant_id());
 
 CREATE POLICY "profiles_update" ON public.profiles
-  FOR UPDATE USING (tenant_id = auth.tenant_id());
+  FOR UPDATE USING (tenant_id = public.get_tenant_id());
 
 -- veiculos: CRUD restrito ao tenant
 CREATE POLICY "veiculos_select" ON public.veiculos
-  FOR SELECT USING (tenant_id = auth.tenant_id());
+  FOR SELECT USING (tenant_id = public.get_tenant_id());
 
 CREATE POLICY "veiculos_insert" ON public.veiculos
-  FOR INSERT WITH CHECK (tenant_id = auth.tenant_id());
+  FOR INSERT WITH CHECK (tenant_id = public.get_tenant_id());
 
 CREATE POLICY "veiculos_update" ON public.veiculos
-  FOR UPDATE USING (tenant_id = auth.tenant_id());
+  FOR UPDATE USING (tenant_id = public.get_tenant_id());
 
 CREATE POLICY "veiculos_delete" ON public.veiculos
-  FOR DELETE USING (tenant_id = auth.tenant_id() AND auth.user_perfil() IN ('gestor','diretor'));
+  FOR DELETE USING (tenant_id = public.get_tenant_id() AND public.get_user_perfil() IN ('gestor','diretor'));
 
 -- checklists: motorista vê os próprios; gestor/analista/diretor vê todos do tenant
 CREATE POLICY "checklists_select" ON public.checklists
   FOR SELECT USING (
-    tenant_id = auth.tenant_id() AND (
-      auth.user_perfil() IN ('gestor','analista','diretor')
+    tenant_id = public.get_tenant_id() AND (
+      public.get_user_perfil() IN ('gestor','analista','diretor')
       OR motorista_id = auth.uid()
     )
   );
 
 CREATE POLICY "checklists_insert" ON public.checklists
-  FOR INSERT WITH CHECK (tenant_id = auth.tenant_id());
+  FOR INSERT WITH CHECK (tenant_id = public.get_tenant_id());
 
 CREATE POLICY "checklists_update" ON public.checklists
   FOR UPDATE USING (
-    tenant_id = auth.tenant_id() AND
-    auth.user_perfil() IN ('gestor','analista','diretor')
+    tenant_id = public.get_tenant_id() AND
+    public.get_user_perfil() IN ('gestor','analista','diretor')
   );
 
 -- checklist_itens e fotos: herdam do checklist
 CREATE POLICY "ck_itens_select" ON public.checklist_itens
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.checklists c WHERE c.id = checklist_id AND c.tenant_id = auth.tenant_id())
+    EXISTS (SELECT 1 FROM public.checklists c WHERE c.id = checklist_id AND c.tenant_id = public.get_tenant_id())
   );
 
 CREATE POLICY "ck_itens_insert" ON public.checklist_itens
   FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM public.checklists c WHERE c.id = checklist_id AND c.tenant_id = auth.tenant_id())
+    EXISTS (SELECT 1 FROM public.checklists c WHERE c.id = checklist_id AND c.tenant_id = public.get_tenant_id())
   );
 
 CREATE POLICY "ck_fotos_select" ON public.checklist_fotos
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.checklists c WHERE c.id = checklist_id AND c.tenant_id = auth.tenant_id())
+    EXISTS (SELECT 1 FROM public.checklists c WHERE c.id = checklist_id AND c.tenant_id = public.get_tenant_id())
   );
 
 CREATE POLICY "ck_fotos_insert" ON public.checklist_fotos
   FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM public.checklists c WHERE c.id = checklist_id AND c.tenant_id = auth.tenant_id())
+    EXISTS (SELECT 1 FROM public.checklists c WHERE c.id = checklist_id AND c.tenant_id = public.get_tenant_id())
   );
 
 -- ocorrencias
 CREATE POLICY "ocorrencias_select" ON public.ocorrencias
   FOR SELECT USING (
-    tenant_id = auth.tenant_id() AND (
-      auth.user_perfil() IN ('gestor','analista','diretor')
+    tenant_id = public.get_tenant_id() AND (
+      public.get_user_perfil() IN ('gestor','analista','diretor')
       OR motorista_id = auth.uid()
     )
   );
 
 CREATE POLICY "ocorrencias_insert" ON public.ocorrencias
-  FOR INSERT WITH CHECK (tenant_id = auth.tenant_id());
+  FOR INSERT WITH CHECK (tenant_id = public.get_tenant_id());
 
 CREATE POLICY "ocorrencias_update" ON public.ocorrencias
   FOR UPDATE USING (
-    tenant_id = auth.tenant_id() AND
-    auth.user_perfil() IN ('gestor','analista','diretor')
+    tenant_id = public.get_tenant_id() AND
+    public.get_user_perfil() IN ('gestor','analista','diretor')
   );
 
 -- trocas
 CREATE POLICY "trocas_select" ON public.trocas
   FOR SELECT USING (
-    tenant_id = auth.tenant_id() AND (
-      auth.user_perfil() IN ('gestor','analista','diretor')
+    tenant_id = public.get_tenant_id() AND (
+      public.get_user_perfil() IN ('gestor','analista','diretor')
       OR motorista_id = auth.uid()
     )
   );
 
 CREATE POLICY "trocas_insert" ON public.trocas
-  FOR INSERT WITH CHECK (tenant_id = auth.tenant_id());
+  FOR INSERT WITH CHECK (tenant_id = public.get_tenant_id());
 
 CREATE POLICY "trocas_update" ON public.trocas
   FOR UPDATE USING (
-    tenant_id = auth.tenant_id() AND
-    auth.user_perfil() IN ('gestor','diretor')
+    tenant_id = public.get_tenant_id() AND
+    public.get_user_perfil() IN ('gestor','diretor')
   );
 
 -- ============================================================
