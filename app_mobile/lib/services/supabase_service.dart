@@ -21,7 +21,7 @@ class SupabaseService {
       if (uid == null) return null;
       final data = await _client
           .from('profiles')
-          .select('id, nome, email, perfil, tenant_id, placa_vinculada')
+          .select('id, nome, email, perfil, tenant_id, placa_vinculada, telas_permitidas, ativo')
           .eq('id', uid)
           .single();
       return data;
