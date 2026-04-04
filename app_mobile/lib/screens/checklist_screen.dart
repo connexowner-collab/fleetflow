@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:signature/signature.dart';
 import '../services/app_data_service.dart';
+import '../services/supabase_service.dart';
 
 class ChecklistScreen extends StatefulWidget {
   const ChecklistScreen({super.key});
@@ -55,6 +56,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   // Step 6 - Assinatura
   late final SignatureController _signCtrl;
 
+  String? _tenantId;
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +67,48 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
       penColor: const Color(0xFF0F5AC4),
       exportBackgroundColor: Colors.white,
     );
+    _loadSupabaseData();
+  }
+
+  Future<void> _loadSupabaseData() async {
+    final svc = SupabaseService();
+
+    // Carrega perfil do usuário (tenant_id + nome)
+    final profile = await svc.getProfile();
+    if (profile != null && mounted) {
+      _tenantId = profile['tenant_id'] as String?;
+      if ((profile['nome'] as String?)?.isNotEmpty == true) {
+        setState(() => _nomeCtrl.text = profile['nome'] as String);
+      }
+    }
+
+    // Carrega opções de dropdown do Supabase
+    final opcoes = await svc.getOpcoesChecklist();
+    final veiculos = await svc.getVeiculos();
+    if (mounted) {
+      setState(() {
+        if (opcoes['unidades']!.isNotEmpty) {
+          _data.unidades
+            ..clear()
+            ..addAll(opcoes['unidades']!);
+        }
+        if (opcoes['setores']!.isNotEmpty) {
+          _data.setores
+            ..clear()
+            ..addAll(opcoes['setores']!);
+        }
+        if (opcoes['areas']!.isNotEmpty) {
+          _data.areas
+            ..clear()
+            ..addAll(opcoes['areas']!);
+        }
+        if (veiculos.isNotEmpty) {
+          _data.veiculos
+            ..clear()
+            ..addAll(veiculos);
+        }
+      });
+    }
   }
 
   @override
@@ -97,7 +142,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         if (_temAvaria) {
           setState(() => _step++);
         } else {
-          _finalize();
+          _finalize().ignore();
         }
       default:
         _finalize();
@@ -205,7 +250,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     );
   }
 
-  void _finalize() {
+  Future<void> _finalize() async {
     if (_signCtrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor, assine o termo'), backgroundColor: Colors.red),
@@ -214,11 +259,14 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     }
     final km = int.parse(_kmCtrl.text.trim().replaceAll('.', ''));
     final ckId = _data.nextCkId();
+    final svc = SupabaseService();
+    final motorista = _nomeCtrl.text.trim();
+    final placa = _placaCtrl.text.trim().toUpperCase();
 
-    _data.addChecklist(ChecklistData(
+    final ckData = ChecklistData(
       id: ckId,
-      motorista: _nomeCtrl.text.trim(),
-      placa: _placaCtrl.text.trim().toUpperCase(),
+      motorista: motorista,
+      placa: placa,
       unidade: _unidade!,
       setor: _setor!,
       area: _area!,
@@ -233,31 +281,41 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
       gravidadeAvaria: _temAvaria ? _gravOcc : null,
       descricaoAvaria: _temAvaria ? _descOccCtrl.text.trim() : null,
       solicitouTroca: _solicitarTroca,
-    ));
+    );
+
+    // Salva localmente
+    _data.addChecklist(ckData);
+
+    // Salva no Supabase (sync em background)
+    svc.saveChecklist(ckData, _tenantId);
 
     if (_temAvaria) {
-      _data.addOcorrencia(OcorrenciaData(
+      final ocData = OcorrenciaData(
         id: _data.nextOcId(),
-        motorista: _nomeCtrl.text.trim(),
-        placa: _placaCtrl.text.trim().toUpperCase(),
+        motorista: motorista,
+        placa: placa,
         veiculo: _veiculo!,
         categoria: _catOcc,
         gravidade: _gravOcc,
         descricao: _descOccCtrl.text.trim(),
         checklistId: ckId,
         data: DateTime.now(),
-      ));
+      );
+      _data.addOcorrencia(ocData);
+      svc.saveOcorrencia(ocData, _tenantId);
     }
 
     if (_solicitarTroca) {
-      _data.addTroca(TrocaData(
+      final trData = TrocaData(
         id: _data.nextTrId(),
-        motorista: _nomeCtrl.text.trim(),
-        veiculoAntigo: 'Volvo FH 540 (${_data.currentPlaca})',
+        motorista: motorista,
+        veiculoAntigo: _data.currentPlaca,
         veiculoNovo: _veiculo!,
         checklistId: ckId,
         data: DateTime.now(),
-      ));
+      );
+      _data.addTroca(trData);
+      svc.saveTroca(trData, _tenantId);
     }
 
     if (!mounted) return;
