@@ -39,18 +39,18 @@ export default function FleetPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from('veiculos')
-        .select('id, placa, modelo, motorista, status, km_atual, capacidade_carga')
-        .order('created_at', { ascending: false });
+        .select('id, placa, modelo, tipo, capacidade, status, km_atual, profiles(nome)')
+        .order('placa', { ascending: true });
       if (error) throw error;
       setVehicles(
         (data || []).map((v) => ({
           id: v.id,
           placa: v.placa,
           modelo: v.modelo,
-          motorista: v.motorista ?? 'Nenhum',
+          motorista: (v.profiles as { nome?: string } | null)?.nome ?? 'Nenhum',
           status: v.status,
           km: v.km_atual?.toLocaleString('pt-BR') ?? '0',
-          carga: v.capacidade_carga ?? 'N/A',
+          carga: v.capacidade ?? 'N/A',
         }))
       );
     } catch {
@@ -81,12 +81,13 @@ export default function FleetPage() {
     }
     try {
       const supabase = createClient();
+      const { data: tenantRow } = await supabase.from('tenants').select('id').single();
       const { error } = await supabase.from('veiculos').insert({
+        tenant_id: tenantRow?.id,
         placa: newPlaca.toUpperCase(),
         modelo: newModelo,
-        motorista: newMotorista || null,
         status: 'Disponível',
-        capacidade_carga: newCarga || null,
+        capacidade: newCarga || null,
       });
       if (error) throw error;
       await fetchVehicles();
