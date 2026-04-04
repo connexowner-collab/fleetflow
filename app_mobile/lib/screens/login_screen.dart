@@ -240,7 +240,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   child: _loading
                                     ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                                     : const Text(
-                                    'ENTRAR NO SISTEMA',
+                                    'LOGIN',
                                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1),
                                   ),
                                 ),
