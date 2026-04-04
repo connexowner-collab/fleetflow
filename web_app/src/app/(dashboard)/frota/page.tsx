@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client';
-import { Truck, Users, Activity, Wrench, MoreVertical, Search, Plus, Filter, ArrowRight, X, CheckCircle, Eye } from 'lucide-react';
+import { Truck, Users, Activity, Wrench, MoreVertical, Search, Plus, Filter, X, CheckCircle, Eye } from 'lucide-react';
 
 const statusStyles: Record<string, string> = {
   'Em Rota': 'bg-blue-100 text-blue-700 border-blue-200',
@@ -36,18 +35,14 @@ export default function FleetPage() {
 
   const fetchVehicles = async () => {
     try {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('veiculos')
-        .select('id, placa, modelo, tipo, capacidade, status, km_atual, profiles(nome)')
-        .order('placa', { ascending: true });
-      if (error) throw error;
+      const res = await fetch('/api/admin/frota');
+      const json = await res.json();
       setVehicles(
-        (data || []).map((v) => ({
+        (json.veiculos || []).map((v: { id: string; placa: string; modelo: string; profiles?: { nome?: string } | null; status: string; km_atual?: number; capacidade?: string }) => ({
           id: v.id,
           placa: v.placa,
           modelo: v.modelo,
-          motorista: (v.profiles as { nome?: string } | null)?.nome ?? 'Nenhum',
+          motorista: v.profiles?.nome ?? 'Nenhum',
           status: v.status,
           km: v.km_atual?.toLocaleString('pt-BR') ?? '0',
           carga: v.capacidade ?? 'N/A',
@@ -80,16 +75,13 @@ export default function FleetPage() {
       return;
     }
     try {
-      const supabase = createClient();
-      const { data: tenantRow } = await supabase.from('tenants').select('id').single();
-      const { error } = await supabase.from('veiculos').insert({
-        tenant_id: tenantRow?.id,
-        placa: newPlaca.toUpperCase(),
-        modelo: newModelo,
-        status: 'Disponível',
-        capacidade: newCarga || null,
+      const res = await fetch('/api/admin/frota', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ placa: newPlaca, modelo: newModelo, capacidade: newCarga }),
       });
-      if (error) throw error;
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
       await fetchVehicles();
       setIsModalOpen(false);
       setNewPlaca(''); setNewModelo(''); setNewMotorista(''); setNewCarga('');
