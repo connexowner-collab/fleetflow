@@ -106,20 +106,27 @@ async function enviarEmailAcesso(params: {
 export async function GET() {
   const supabase = createAdminClient()
   try {
-    const full = await supabase
+    // Busca profiles com tenant
+    const { data: profiles, error: profError } = await supabase
       .from('profiles')
-      .select('id, nome, email, perfil, ativo, telas_permitidas, veiculo_id, tenant_id, tenants(nome), veiculos(id, placa, modelo)')
+      .select('id, nome, email, perfil, ativo, telas_permitidas, veiculo_id, placa_vinculada, tenant_id, tenants(nome)')
       .order('created_at', { ascending: false })
 
-    if (full.error) {
-      const fallback = await supabase
-        .from('profiles')
-        .select('id, nome, email, perfil, ativo, telas_permitidas, tenant_id, tenants(nome)')
-        .order('created_at', { ascending: false })
-      return NextResponse.json({ users: fallback.data ?? [] })
-    }
+    if (profError) throw profError
 
-    return NextResponse.json({ users: full.data ?? [] })
+    // Busca veículos separadamente para enriquecer os profiles
+    const { data: veiculos } = await supabase
+      .from('veiculos')
+      .select('id, placa, modelo')
+
+    const veiculoMap = Object.fromEntries((veiculos ?? []).map(v => [v.id, v]))
+
+    const users = (profiles ?? []).map(p => ({
+      ...p,
+      veiculos: p.veiculo_id ? (veiculoMap[p.veiculo_id] ?? null) : null,
+    }))
+
+    return NextResponse.json({ users })
   } catch {
     return NextResponse.json({ users: [] })
   }
