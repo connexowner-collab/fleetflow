@@ -11,12 +11,22 @@ const roleMap: Record<string, string> = {
 export async function GET() {
   const supabase = createAdminClient()
   try {
-    const { data: profiles, error } = await supabase
+    // Tenta query completa com veiculo_id
+    const full = await supabase
       .from('profiles')
       .select('id, nome, email, perfil, ativo, telas_permitidas, veiculo_id, tenant_id, tenants(nome), veiculos(id, placa, modelo)')
       .order('created_at', { ascending: false })
-    if (error) throw error
-    return NextResponse.json({ users: profiles ?? [] })
+
+    // Se falhar (ex: coluna veiculo_id não existe ainda), faz query simplificada
+    if (full.error) {
+      const fallback = await supabase
+        .from('profiles')
+        .select('id, nome, email, perfil, ativo, telas_permitidas, tenant_id, tenants(nome)')
+        .order('created_at', { ascending: false })
+      return NextResponse.json({ users: fallback.data ?? [] })
+    }
+
+    return NextResponse.json({ users: full.data ?? [] })
   } catch {
     return NextResponse.json({ users: [] })
   }
@@ -36,14 +46,15 @@ export async function POST(request: Request) {
     })
     if (error) throw error
 
-    // Atualiza o perfil criado pelo trigger com telas, veículo e acesso
     if (data.user) {
-      await supabase.from('profiles').update({
+      const updates: Record<string, unknown> = {
         telas_permitidas: telasPermitidas,
-        veiculo_id: veiculo_id || null,
-        placa_vinculada: placa || null,
         acesso: acesso ?? 'app',
-      }).eq('id', data.user.id)
+      }
+      if (veiculo_id) updates.veiculo_id = veiculo_id
+      if (placa) updates.placa_vinculada = placa
+
+      await supabase.from('profiles').update(updates).eq('id', data.user.id)
     }
 
     return NextResponse.json({ user: data.user })
