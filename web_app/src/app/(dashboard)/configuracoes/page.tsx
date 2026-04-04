@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Settings, Building, Palette, Bell, Shield, Save, CheckCircle, ClipboardList, Plus, Trash2, MapPin, Briefcase, Grid3X3 } from 'lucide-react';
+import { Settings, Building, Bell, Shield, Save, CheckCircle, ClipboardList, Plus, Trash2, MapPin, Briefcase, Grid3X3, Wrench } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 
 type Opcao = { id: string; valor: string; ativo: boolean };
-type Categoria = 'unidade' | 'setor' | 'area';
+type Categoria = 'unidade' | 'setor' | 'area' | 'item_inspecao';
 
 export default function ConfiguracoesPage() {
   const [toast, setToast] = useState<string | null>(null);
@@ -23,7 +23,8 @@ export default function ConfiguracoesPage() {
   const [unidades, setUnidades] = useState<Opcao[]>([]);
   const [setores, setSetores] = useState<Opcao[]>([]);
   const [areas, setAreas] = useState<Opcao[]>([]);
-  const [novaOpcao, setNovaOpcao] = useState<Record<Categoria, string>>({ unidade: '', setor: '', area: '' });
+  const [itensInspecao, setItensInspecao] = useState<Opcao[]>([]);
+  const [novaOpcao, setNovaOpcao] = useState<Record<Categoria, string>>({ unidade: '', setor: '', area: '', item_inspecao: '' });
   const [loadingOpcoes, setLoadingOpcoes] = useState(true);
 
   const showToast = (msg: string) => {
@@ -55,6 +56,7 @@ export default function ConfiguracoesPage() {
         setUnidades(opcoes.filter(o => o.categoria === 'unidade').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
         setSetores(opcoes.filter(o => o.categoria === 'setor').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
         setAreas(opcoes.filter(o => o.categoria === 'area').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
+        setItensInspecao(opcoes.filter(o => o.categoria === 'item_inspecao').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
       }
       setLoadingOpcoes(false);
     }
@@ -92,6 +94,7 @@ export default function ConfiguracoesPage() {
     if (cat === 'unidade') setUnidades(prev => [...prev, nova].sort((a, b) => a.valor.localeCompare(b.valor)));
     if (cat === 'setor') setSetores(prev => [...prev, nova].sort((a, b) => a.valor.localeCompare(b.valor)));
     if (cat === 'area') setAreas(prev => [...prev, nova].sort((a, b) => a.valor.localeCompare(b.valor)));
+    if (cat === 'item_inspecao') setItensInspecao(prev => [...prev, nova]);
 
     setNovaOpcao(prev => ({ ...prev, [cat]: '' }));
     showToast(`✅ "${valor}" adicionado em ${cat === 'unidade' ? 'Unidades' : cat === 'setor' ? 'Setores' : 'Áreas'}!`);
@@ -106,6 +109,7 @@ export default function ConfiguracoesPage() {
     if (cat === 'unidade') setUnidades(prev => prev.filter(o => o.id !== id));
     if (cat === 'setor') setSetores(prev => prev.filter(o => o.id !== id));
     if (cat === 'area') setAreas(prev => prev.filter(o => o.id !== id));
+    if (cat === 'item_inspecao') setItensInspecao(prev => prev.filter(o => o.id !== id));
 
     showToast(`🗑️ "${valor}" removido.`);
   };
@@ -298,7 +302,7 @@ export default function ConfiguracoesPage() {
             <ClipboardList className="w-5 h-5 text-brand-primary mt-0.5 shrink-0" />
             <div>
               <p className="text-sm font-semibold text-brand-primary">Campos configuráveis do Checklist Diário</p>
-              <p className="text-xs text-blue-700 mt-1">As opções abaixo aparecem nos dropdowns do aplicativo mobile. Alterações refletem imediatamente para todos os motoristas. Os campos <strong>Veículo</strong> e <strong>Itens de Inspeção Técnica</strong> não são editáveis aqui.</p>
+              <p className="text-xs text-blue-700 mt-1">Todas as opções abaixo aparecem no aplicativo mobile. Alterações refletem imediatamente para todos os motoristas. O campo <strong>Veículo</strong> é gerenciado na tela de Frota.</p>
             </div>
           </div>
 
@@ -306,6 +310,10 @@ export default function ConfiguracoesPage() {
             <OpcaoManager cat="unidade" lista={unidades} label="Unidades" icon={<MapPin className="w-4 h-4" />} />
             <OpcaoManager cat="setor" lista={setores} label="Setores" icon={<Briefcase className="w-4 h-4" />} />
             <OpcaoManager cat="area" lista={areas} label="Áreas" icon={<Grid3X3 className="w-4 h-4" />} />
+          </div>
+
+          <div className="mt-2">
+            <OpcaoManager cat="item_inspecao" lista={itensInspecao} label="Itens de Inspeção Técnica" icon={<Wrench className="w-4 h-4" />} />
           </div>
         </>
       )}

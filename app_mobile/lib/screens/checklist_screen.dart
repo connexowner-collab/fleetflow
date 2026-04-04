@@ -33,7 +33,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   final _kmCtrl = TextEditingController();
   final _obsCtrl = TextEditingController();
   String? _kmErro;
-  final Map<String, bool> _itens = {
+  Map<String, bool> _itens = {
     'Lâmpadas estão OK?': true,
     'Pneus estão OK?': true,
     'Estepe, triângulo e macaco estão OK?': true,
@@ -106,6 +106,9 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
           _data.veiculos
             ..clear()
             ..addAll(veiculos);
+        }
+        if (opcoes['itens_inspecao']!.isNotEmpty) {
+          _itens = { for (final item in opcoes['itens_inspecao']!) item: true };
         }
       });
     }

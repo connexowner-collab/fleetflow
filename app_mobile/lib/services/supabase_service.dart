@@ -43,6 +43,7 @@ class SupabaseService {
         'unidades': [],
         'setores': [],
         'areas': [],
+        'itens_inspecao': [],
       };
 
       for (final row in (data as List)) {
@@ -51,11 +52,12 @@ class SupabaseService {
         if (cat == 'unidade') result['unidades']!.add(val);
         if (cat == 'setor') result['setores']!.add(val);
         if (cat == 'area') result['areas']!.add(val);
+        if (cat == 'item_inspecao') result['itens_inspecao']!.add(val);
       }
 
       return result;
     } catch (_) {
-      return {'unidades': [], 'setores': [], 'areas': []};
+      return {'unidades': [], 'setores': [], 'areas': [], 'itens_inspecao': []};
     }
   }
 
