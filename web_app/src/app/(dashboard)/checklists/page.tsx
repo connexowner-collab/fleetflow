@@ -1,45 +1,92 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/utils/supabase/client';
 import { Search, Filter, AlertTriangle, CheckCircle2, Clock, Car, User, Camera, ClipboardCheck, X, FileSignature, ThermometerSun, AlertOctagon, Lightbulb } from 'lucide-react';
 
-const initialInspections = [
-  { 
-    id: 'CK-1049', motorista: 'Roberto Alves', placa: 'ABC-1234', data: 'Hoje, 07:15', status: 'Aprovado', km: '154.200', 
-    mec: { oleo: true, pneus: true, luzes: true, freios: true } 
-  },
-  { 
-    id: 'CK-1050', motorista: 'João Silva', placa: 'XYZ-9876', data: 'Hoje, 08:30', status: 'Pendente', km: '98.500', 
-    mec: { oleo: true, pneus: false, luzes: true, freios: true } 
-  },
-  { 
-    id: 'CK-1051', motorista: 'Carlos Santos', placa: 'DEF-5555', data: 'Ontem, 19:45', status: 'Avaria Grave', km: '210.100', 
-    mec: { oleo: false, pneus: true, luzes: false, freios: true } 
-  },
-];
-
-type Inspection = typeof initialInspections[0];
+type Inspection = {
+  id: string;
+  id_real: string;
+  motorista: string;
+  placa: string;
+  data: string;
+  status: string;
+  km: string;
+  mec: { oleo: boolean; pneus: boolean; luzes: boolean; freios: boolean };
+};
 
 export default function ChecklistsPage() {
-  const [inspections, setInspections] = useState<Inspection[]>(initialInspections);
+  const [inspections, setInspections] = useState<Inspection[]>([]);
   const [selectedInspection, setSelectedInspection] = useState<Inspection | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  const fetchInspections = async () => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('checklists')
+        .select('id, codigo, motorista, placa, km_atual, status, itens_json, created_at')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setInspections(
+        (data || []).map((c) => ({
+          id: c.codigo || c.id,
+          id_real: c.id,
+          motorista: c.motorista || '',
+          placa: c.placa || '',
+          data:
+            new Date(c.created_at).toLocaleDateString('pt-BR') +
+            ', ' +
+            new Date(c.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          status: c.status || 'Pendente',
+          km: c.km_atual?.toLocaleString('pt-BR') ?? '0',
+          mec: { oleo: true, pneus: true, luzes: true, freios: true },
+        }))
+      );
+    } catch {
+      setInspections([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchInspections();
+  }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3500);
   };
 
-  const handleAprovar = (id: string) => {
-    setInspections(prev => prev.map(insp => insp.id === id ? { ...insp, status: 'Aprovado' } : insp));
-    setSelectedInspection(null);
-    showToast(`✅ Inspeção ${id} aprovada com sucesso!`);
+  const handleAprovar = async (inspection: Inspection) => {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('checklists')
+        .update({ status: 'Aprovado' })
+        .eq('id', inspection.id_real);
+      if (error) throw error;
+      setInspections(prev => prev.map(insp => insp.id_real === inspection.id_real ? { ...insp, status: 'Aprovado' } : insp));
+      setSelectedInspection(null);
+      showToast(`✅ Inspeção ${inspection.id} aprovada com sucesso!`);
+    } catch {
+      showToast('⚠️ Erro ao aprovar inspeção.');
+    }
   };
 
-  const handleRecusar = (id: string) => {
-    setInspections(prev => prev.map(insp => insp.id === id ? { ...insp, status: 'Avaria Grave' } : insp));
-    setSelectedInspection(null);
-    showToast(`❌ Inspeção ${id} recusada. Veículo bloqueado para saída.`);
+  const handleRecusar = async (inspection: Inspection) => {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('checklists')
+        .update({ status: 'Avaria Grave' })
+        .eq('id', inspection.id_real);
+      if (error) throw error;
+      setInspections(prev => prev.map(insp => insp.id_real === inspection.id_real ? { ...insp, status: 'Avaria Grave' } : insp));
+      setSelectedInspection(null);
+      showToast(`❌ Inspeção ${inspection.id} recusada. Veículo bloqueado para saída.`);
+    } catch {
+      showToast('⚠️ Erro ao recusar inspeção.');
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -64,13 +111,13 @@ export default function ChecklistsPage() {
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center">
-            <ClipboardCheck className="w-8 h-8 mr-3 text-brand-primary" /> 
+            <ClipboardCheck className="w-8 h-8 mr-3 text-brand-primary" />
             Central de Inspeções Diárias
           </h1>
           <p className="text-gray-500 mt-2">Validação e liberação dos checklists operacionais recebidos pelo App do Motorista.</p>
         </div>
         <div className="flex gap-3">
-          <button 
+          <button
             onClick={() => showToast('🔍 Filtros de placas em desenvolvimento.')}
             className="group bg-white border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl flex items-center font-bold shadow-sm hover:border-brand-primary/50 hover:text-brand-primary transition-all cursor-pointer"
           >
@@ -83,24 +130,24 @@ export default function ChecklistsPage() {
       {/* Grid de Checklists */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
         {inspections.map((insp) => (
-          <div 
-            key={insp.id} 
-            onClick={() => setSelectedInspection(insp)} 
+          <div
+            key={insp.id_real}
+            onClick={() => setSelectedInspection(insp)}
             className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 cursor-pointer hover:shadow-xl hover:border-brand-primary/30 hover:-translate-y-1 transition-all group relative overflow-hidden"
           >
             <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/5 rounded-bl-full -mr-12 -mt-12 group-hover:bg-brand-primary/10 transition-colors" />
-            
+
             <div className="flex justify-between items-start mb-6 relative">
               <div>
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{insp.id}</span>
                 <h3 className="text-xl font-black text-gray-900 mt-1 flex items-center">
-                  <Car className="w-5 h-5 mr-3 text-brand-primary" /> 
+                  <Car className="w-5 h-5 mr-3 text-brand-primary" />
                   {insp.placa}
                 </h3>
               </div>
               {getStatusBadge(insp.status)}
             </div>
-            
+
             <div className="space-y-3 mb-6 relative">
               <div className="flex items-center text-sm font-bold text-gray-700">
                 <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center mr-3 text-[10px] text-brand-primary">
@@ -109,7 +156,7 @@ export default function ChecklistsPage() {
                 {insp.motorista}
               </div>
               <p className="text-xs text-gray-400 flex items-center font-bold">
-                <Clock className="w-3.5 h-3.5 mr-2" /> 
+                <Clock className="w-3.5 h-3.5 mr-2" />
                 ENVIADO: {insp.data.toUpperCase()}
               </p>
             </div>
@@ -138,7 +185,7 @@ export default function ChecklistsPage() {
           <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
             <div className="pointer-events-auto w-screen max-w-xl transform transition-transform animate-in slide-in-from-right duration-500 shadow-2xl">
               <div className="flex h-full flex-col bg-white overflow-hidden">
-                
+
                 {/* Header Customizado */}
                 <div className="bg-gray-900 px-8 py-10 flex items-center justify-between relative overflow-hidden shrink-0">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-brand-primary opacity-20 blur-3xl rounded-bl-full pointer-events-none translate-x-1/2 -translate-y-1/2"></div>
@@ -157,7 +204,7 @@ export default function ChecklistsPage() {
                 </div>
 
                 <div className="relative flex-1 px-8 py-8 space-y-8 flex flex-col justify-start overflow-y-auto bg-gray-50/50">
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
                       <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-2">Condutor Reportado</p>
@@ -173,7 +220,7 @@ export default function ChecklistsPage() {
 
                   <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
                     <h3 className="text-sm font-black text-gray-900 mb-6 uppercase tracking-wider flex items-center">
-                      <AlertOctagon className="w-5 h-5 mr-3 text-red-500" /> 
+                      <AlertOctagon className="w-5 h-5 mr-3 text-red-500" />
                       Itens de Segurança Crítica
                     </h3>
                     <div className="space-y-4">
@@ -199,7 +246,7 @@ export default function ChecklistsPage() {
 
                   <div>
                     <h3 className="text-sm font-black text-gray-900 mb-6 uppercase tracking-wider flex items-center">
-                      <Camera className="w-5 h-5 mr-3 text-brand-primary" /> 
+                      <Camera className="w-5 h-5 mr-3 text-brand-primary" />
                       Evidências Fotográficas (APP)
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
@@ -229,22 +276,22 @@ export default function ChecklistsPage() {
                     </p>
                     <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest mt-6">Assinatura Digital Auditada via Fingerprint</p>
                   </div>
-                  
+
                 </div>
 
                 {/* Ações Fixas no Footer */}
                 <div className="border-t border-gray-200 px-8 py-6 bg-white flex justify-end gap-4 shadow-[0_-15px_35px_-5px_rgba(0,0,0,0.05)] shrink-0">
-                  <button 
-                    onClick={() => handleRecusar(selectedInspection.id)} 
+                  <button
+                    onClick={() => handleRecusar(selectedInspection)}
                     className="px-6 py-4 text-xs font-black text-red-700 bg-red-50 hover:bg-red-100 rounded-2xl transition-all mr-auto uppercase tracking-widest border border-red-100"
                   >
                     Recusar Checklist
                   </button>
-                  <button 
-                    onClick={() => handleAprovar(selectedInspection.id)} 
+                  <button
+                    onClick={() => handleAprovar(selectedInspection)}
                     className="px-10 py-4 text-xs font-black text-white bg-green-600 border border-transparent rounded-2xl shadow-xl shadow-green-600/20 hover:bg-green-700 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center uppercase tracking-widest"
                   >
-                    <CheckCircle2 className="w-4 h-4 mr-3" /> 
+                    <CheckCircle2 className="w-4 h-4 mr-3" />
                     Validar e Liberar
                   </button>
                 </div>

@@ -1,35 +1,74 @@
 "use client";
 
-import { AlertTriangle, Tag, Eye, Truck, Wrench, X, CheckCircle, MessageSquare } from 'lucide-react';
-import { useState } from 'react';
+import { AlertTriangle, Tag, Eye, Truck, Wrench, X, CheckCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/utils/supabase/client';
 
-const recentOccurrences = [
-  { placa: 'ABC-1234', motorista: 'Carlos Silva', gravidade: 'Grave', data: 'Hoje, 08:30', badgeClass: 'bg-red-100 text-red-700', status: 'Aberta' },
-  { placa: 'XYZ-9876', motorista: 'Roberto Alves', gravidade: 'Média', data: 'Ontem, 19:15', badgeClass: 'bg-yellow-100 text-yellow-700', status: 'Em Tratativa' },
-  { placa: 'JKL-4567', motorista: 'Felipe Costa', gravidade: 'Leve', data: '28/03/2026', badgeClass: 'bg-green-100 text-green-700', status: 'Concluída' },
-  { placa: 'MNO-5555', motorista: 'Ana Souza', gravidade: 'Média', data: '28/03/2026', badgeClass: 'bg-yellow-100 text-yellow-700', status: 'Aberta' },
-];
+type Occurrence = { placa: string; motorista: string; gravidade: string; data: string; badgeClass: string; status: string; id: string }
 
 export default function Dashboard() {
   const [toast, setToast] = useState<string | null>(null);
   const [isNewVehicleOpen, setIsNewVehicleOpen] = useState(false);
   const [newPlaca, setNewPlaca] = useState('');
   const [newModelo, setNewModelo] = useState('');
+  const [metrics, setMetrics] = useState({ totalVeiculos: 0, emManutencao: 0, ocorrenciasAtivas: 0, gravesNaoTratadas: 0, trocasPendentes: 0 });
+  const [recentOccurrences, setRecentOccurrences] = useState<Occurrence[]>([]);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    async function load() {
+      const [veicRes, ocRes] = await Promise.all([
+        supabase.from('veiculos').select('id, status'),
+        supabase.from('ocorrencias').select('id, codigo, placa, motorista, gravidade, status, created_at').order('created_at', { ascending: false }).limit(6),
+      ]);
+
+      const veics = veicRes.data ?? [];
+      setMetrics({
+        totalVeiculos: veics.length,
+        emManutencao: veics.filter((v) => v.status === 'Em Manutenção').length,
+        ocorrenciasAtivas: (ocRes.data ?? []).filter((o) => o.status === 'Aberta' || o.status === 'Em Tratativa').length,
+        gravesNaoTratadas: (ocRes.data ?? []).filter((o) => o.gravidade === 'Grave' && o.status === 'Aberta').length,
+        trocasPendentes: 0,
+      });
+
+      const gravBadge: Record<string, string> = { Grave: 'bg-red-100 text-red-700', Média: 'bg-yellow-100 text-yellow-700', Leve: 'bg-green-100 text-green-700' };
+      setRecentOccurrences(
+        (ocRes.data ?? []).map((o) => ({
+          id: o.codigo ?? o.id,
+          placa: o.placa ?? '',
+          motorista: o.motorista ?? '',
+          gravidade: o.gravidade,
+          data: new Date(o.created_at).toLocaleDateString('pt-BR'),
+          badgeClass: gravBadge[o.gravidade] ?? 'bg-gray-100 text-gray-700',
+          status: o.status,
+        }))
+      );
+    }
+
+    load();
+  }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3500);
   };
 
-  const handleNovoVeiculo = () => {
+  const handleNovoVeiculo = async () => {
     if (!newPlaca || !newModelo) {
       showToast('⚠️ Placa e Modelo são obrigatórios.');
       return;
     }
+    const supabase = createClient();
+    const { error } = await supabase.from('veiculos').insert({ placa: newPlaca.toUpperCase(), modelo: newModelo, status: 'Disponível' });
     setIsNewVehicleOpen(false);
     setNewPlaca('');
     setNewModelo('');
-    showToast(`✅ Veículo ${newPlaca.toUpperCase()} adicionado! Confira em Gestão da Frota.`);
+    if (error) {
+      showToast(`⚠️ Erro ao cadastrar: ${error.message}`);
+    } else {
+      showToast(`✅ Veículo ${newPlaca.toUpperCase()} adicionado! Confira em Gestão da Frota.`);
+    }
   };
 
   return (
@@ -105,10 +144,8 @@ export default function Dashboard() {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start justify-between group hover:shadow-md transition-shadow">
           <div>
             <p className="text-sm font-medium text-gray-500 mb-1">Total de Veículos</p>
-            <h3 className="text-3xl font-bold text-gray-900">142</h3>
-            <p className="text-xs text-green-600 mt-2 font-medium flex items-center">
-              <span className="bg-green-100 px-1.5 py-0.5 rounded mr-1">+4</span> este mês
-            </p>
+            <h3 className="text-3xl font-bold text-gray-900">{metrics.totalVeiculos}</h3>
+            <p className="text-xs text-gray-500 mt-2 font-medium">na frota ativa</p>
           </div>
           <div className="p-3 bg-brand-primary/10 rounded-xl text-brand-primary group-hover:scale-110 transition-transform">
             <Truck className="w-6 h-6" />
@@ -118,8 +155,8 @@ export default function Dashboard() {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start justify-between group hover:shadow-md transition-shadow">
           <div>
             <p className="text-sm font-medium text-gray-500 mb-1">Ocorrências Ativas</p>
-            <h3 className="text-3xl font-bold text-gray-900">18</h3>
-            <p className="text-xs text-red-600 mt-2 font-medium">3 graves não tratadas</p>
+            <h3 className="text-3xl font-bold text-gray-900">{metrics.ocorrenciasAtivas}</h3>
+            <p className="text-xs text-red-600 mt-2 font-medium">{metrics.gravesNaoTratadas} graves não tratadas</p>
           </div>
           <div className="p-3 bg-red-100 rounded-xl text-red-600 group-hover:scale-110 transition-transform">
             <AlertTriangle className="w-6 h-6" />
@@ -129,8 +166,8 @@ export default function Dashboard() {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start justify-between group hover:shadow-md transition-shadow">
           <div>
             <p className="text-sm font-medium text-gray-500 mb-1">Aguardando Avaliação</p>
-            <h3 className="text-3xl font-bold text-gray-900">5</h3>
-            <p className="text-xs text-yellow-600 mt-2 font-medium">Orçamentos pendentes</p>
+            <h3 className="text-3xl font-bold text-gray-900">{metrics.trocasPendentes}</h3>
+            <p className="text-xs text-yellow-600 mt-2 font-medium">Trocas pendentes</p>
           </div>
           <div className="p-3 bg-yellow-100 rounded-xl text-yellow-600 group-hover:scale-110 transition-transform">
             <Tag className="w-6 h-6" />
@@ -140,7 +177,7 @@ export default function Dashboard() {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start justify-between group hover:shadow-md transition-shadow">
           <div>
             <p className="text-sm font-medium text-gray-500 mb-1">Em Manutenção</p>
-            <h3 className="text-3xl font-bold text-gray-900">11</h3>
+            <h3 className="text-3xl font-bold text-gray-900">{metrics.emManutencao}</h3>
             <p className="text-xs text-gray-500 mt-2 font-medium">Nas oficinas credenciadas</p>
           </div>
           <div className="p-3 bg-blue-100 rounded-xl text-blue-600 group-hover:scale-110 transition-transform">

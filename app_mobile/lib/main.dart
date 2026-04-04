@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/home_screen.dart';
 import 'screens/checklist_screen.dart';
 import 'screens/exchange_checklist_screen.dart';
@@ -6,7 +7,14 @@ import 'screens/history_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/occurrence_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://ywjyyuqsjjhclqomwrsr.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3anl5dXFzampoY2xxb213cnNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNzU1NzYsImV4cCI6MjA5MDc1MTU3Nn0.cAycf6axrP0fbRMTCsz7J-ptSruom0nHt1YDBDZXFcY',
+  );
+
   runApp(const FleetFlowApp());
 }
 

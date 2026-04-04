@@ -37,10 +37,12 @@ export async function updateSession(request: NextRequest) {
   // Proteger rotas (ex: redirecionar para /login se não estiver logado e estiver acessando dashboard)
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/landing')
   
-  if (!user && !isAuthRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    return NextResponse.redirect(url);
+  const isDashboardRoute = !isAuthRoute && request.nextUrl.pathname !== '/' && !request.nextUrl.pathname.startsWith('/offline')
+
+  if (!user && isDashboardRoute) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
   }
 
   return supabaseResponse

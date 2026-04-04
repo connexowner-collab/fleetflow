@@ -1,61 +1,98 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/utils/supabase/client';
 import { Truck, User, ArrowRight, Eye, CheckCircle2, XCircle, Clock, AlertCircle, FileText, Camera, ShieldCheck, Calendar, X } from 'lucide-react';
 
-const initialExchanges = [
-  { 
-    id: 'TR-501', 
-    motorista: 'Roberto Alves', 
-    de: 'Volvo FH 540 (ABC-1234)', 
-    para: 'Scania R450 (XYZ-9876)', 
-    data: 'Hoje, 09:45', 
-    status: 'Pendente',
-    motivo: 'Fim do turno / Manutenção preventivas do Volvo',
-    assinatura: 'Roberto Alves - Digitalmente em 31/03/2026 09:45',
-    laudoDevolucao: {
-      oleo: true, pneus: true, luzes: true, limpeza: false, avaria: 'Arranhão leve para-choque frontal'
-    },
-    laudoRetirada: {
-      oleo: true, pneus: true, luzes: true, limpeza: true, kit: true
-    }
-  },
-  { 
-    id: 'TR-502', 
-    motorista: 'Carlos Silva', 
-    de: 'Mercedes Axor (GHI-5678)', 
-    para: 'DAF XF (JKL-9012)', 
-    data: 'Hoje, 11:20', 
-    status: 'Aprovada',
-    motivo: 'Escalar carga pesada para DAF',
-    assinatura: 'Carlos Silva - Digitalmente em 31/03/2026 11:30',
-    laudoDevolucao: { oleo: true, pneus: true, luzes: true, limpeza: true, avaria: null },
-    laudoRetirada: { oleo: true, pneus: true, luzes: true, limpeza: true, kit: true }
-  }
-];
-
-type Exchange = typeof initialExchanges[0];
+type Exchange = {
+  id: string;
+  id_real: string;
+  motorista: string;
+  de: string;
+  para: string;
+  data: string;
+  status: string;
+  motivo: string;
+  assinatura: string;
+  laudoDevolucao: { oleo: boolean; pneus: boolean; luzes: boolean; limpeza: boolean; avaria: string | null };
+  laudoRetirada: { oleo: boolean; pneus: boolean; luzes: boolean; limpeza: boolean; kit: boolean };
+};
 
 export default function VehicleExchangesPage() {
-  const [exchanges, setExchanges] = useState<Exchange[]>(initialExchanges);
+  const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [selectedExchange, setSelectedExchange] = useState<Exchange | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  const fetchExchanges = async () => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('trocas')
+        .select('id, codigo, motorista, veiculo_antigo, veiculo_novo, status, motivo, created_at')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setExchanges(
+        (data || []).map((t) => ({
+          id: t.codigo || t.id,
+          id_real: t.id,
+          motorista: t.motorista || '',
+          de: t.veiculo_antigo || '',
+          para: t.veiculo_novo || '',
+          data:
+            new Date(t.created_at).toLocaleDateString('pt-BR') +
+            ', ' +
+            new Date(t.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          status: t.status,
+          motivo: t.motivo || '',
+          assinatura: '',
+          laudoDevolucao: { oleo: true, pneus: true, luzes: true, limpeza: true, avaria: null },
+          laudoRetirada: { oleo: true, pneus: true, luzes: true, limpeza: true, kit: true },
+        }))
+      );
+    } catch {
+      setExchanges([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchExchanges();
+  }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3500);
   };
 
-  const handleAprovar = (id: string) => {
-    setExchanges(prev => prev.map(ex => ex.id === id ? { ...ex, status: 'Aprovada' } : ex));
-    setSelectedExchange(null);
-    showToast(`✅ Troca ${id} aprovada e vinculada no sistema!`);
+  const handleAprovar = async (exchange: Exchange) => {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('trocas')
+        .update({ status: 'Aprovada' })
+        .eq('id', exchange.id_real);
+      if (error) throw error;
+      await fetchExchanges();
+      setSelectedExchange(null);
+      showToast(`✅ Troca ${exchange.id} aprovada e vinculada no sistema!`);
+    } catch {
+      showToast('⚠️ Erro ao aprovar troca.');
+    }
   };
 
-  const handleRecusar = (id: string) => {
-    setExchanges(prev => prev.map(ex => ex.id === id ? { ...ex, status: 'Recusada' } : ex));
-    setSelectedExchange(null);
-    showToast(`❌ Troca ${id} recusada. O motorista deve refazer o checklist.`);
+  const handleRecusar = async (exchange: Exchange) => {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('trocas')
+        .update({ status: 'Recusada' })
+        .eq('id', exchange.id_real);
+      if (error) throw error;
+      await fetchExchanges();
+      setSelectedExchange(null);
+      showToast(`❌ Troca ${exchange.id} recusada. O motorista deve refazer o checklist.`);
+    } catch {
+      showToast('⚠️ Erro ao recusar troca.');
+    }
   };
 
   return (
@@ -91,7 +128,7 @@ export default function VehicleExchangesPage() {
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
               {exchanges.map((ex) => (
-                <tr key={ex.id} className="hover:bg-brand-primary/[0.02] transition-colors group">
+                <tr key={ex.id_real} className="hover:bg-brand-primary/[0.02] transition-colors group">
                   <td className="px-8 py-6 font-black text-brand-primary text-base">{ex.id}</td>
                   <td className="px-8 py-6">
                     <div className="flex items-center space-x-4">
@@ -119,15 +156,15 @@ export default function VehicleExchangesPage() {
                   </td>
                   <td className="px-8 py-6 text-center">
                     <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ring-1 ring-inset ${
-                      ex.status === 'Pendente' ? 'bg-yellow-100 text-yellow-800 ring-yellow-500/20' : 
-                      ex.status === 'Aprovada' ? 'bg-green-100 text-green-800 ring-green-500/20' : 
+                      ex.status === 'Pendente' ? 'bg-yellow-100 text-yellow-800 ring-yellow-500/20' :
+                      ex.status === 'Aprovada' ? 'bg-green-100 text-green-800 ring-green-500/20' :
                       'bg-red-100 text-red-800 ring-red-500/20'
                     }`}>
                       {ex.status}
                     </span>
                   </td>
                   <td className="px-8 py-6 text-right">
-                    <button 
+                    <button
                       onClick={() => setSelectedExchange(ex)}
                       disabled={ex.status !== 'Pendente'}
                       className="bg-brand-primary text-white text-[10px] px-5 py-2.5 rounded-xl font-black uppercase tracking-widest shadow-xl shadow-brand-primary/20 hover:bg-brand-primary/90 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-30 disabled:cursor-not-allowed group-hover:scale-105"
@@ -146,7 +183,7 @@ export default function VehicleExchangesPage() {
         <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-end">
           <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-md animate-in fade-in" onClick={() => setSelectedExchange(null)}></div>
           <div className="relative bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-500">
-            
+
             <div className="p-10 border-b bg-gray-900 relative overflow-hidden shrink-0">
                 <div className="absolute -top-20 -right-20 w-80 h-80 bg-brand-secondary opacity-20 blur-3xl rounded-full" />
                 <div className="flex justify-between items-start">
@@ -162,9 +199,9 @@ export default function VehicleExchangesPage() {
                     </button>
                 </div>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto p-10 space-y-12 bg-gray-50/50">
-              
+
               <div className="grid grid-cols-2 gap-8">
                 {/* COLUNA 1: DEVOLUÇÃO */}
                 <div className="space-y-4">
@@ -175,21 +212,21 @@ export default function VehicleExchangesPage() {
                     <p className="font-black text-gray-900 text-sm border-b border-gray-50 pb-3 leading-tight">{selectedExchange.de}</p>
                     <ul className="space-y-3">
                         <li className="flex justify-between text-[11px] font-bold">
-                          <span className="text-gray-400 italic">Mecânica/Elétrica:</span> 
+                          <span className="text-gray-400 italic">Mecânica/Elétrica:</span>
                           <span className="text-green-600 font-black">✓ CONFORME</span>
                         </li>
                         <li className="flex justify-between text-[11px] font-bold">
-                          <span className="text-gray-400 italic">Rodagem (Pneus):</span> 
+                          <span className="text-gray-400 italic">Rodagem (Pneus):</span>
                           <span className="text-green-600 font-black">✓ CONFORME</span>
                         </li>
                         <li className="flex justify-between text-[11px] font-bold">
-                          <span className="text-gray-400 italic">Higiene Interna:</span> 
+                          <span className="text-gray-400 italic">Higiene Interna:</span>
                           <span className="text-red-500 font-black flex items-center bg-red-50 px-2 py-0.5 rounded">⚠ REPROVADO</span>
                         </li>
                     </ul>
                     {selectedExchange.laudoDevolucao.avaria && (
                         <div className="bg-red-50 p-4 rounded-2xl text-[11px] font-bold text-red-700 border border-red-100 flex gap-3 shadow-inner">
-                          <AlertCircle className="w-4 h-4 shrink-0 text-red-400" /> 
+                          <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
                           {selectedExchange.laudoDevolucao.avaria}
                         </div>
                     )}
@@ -205,20 +242,20 @@ export default function VehicleExchangesPage() {
                     <p className="font-black text-gray-900 text-sm border-b border-gray-50 pb-3 leading-tight">{selectedExchange.para}</p>
                     <ul className="space-y-3">
                         <li className="flex justify-between text-[11px] font-bold">
-                          <span className="text-gray-400 italic">Filtros/Óleo:</span> 
+                          <span className="text-gray-400 italic">Filtros/Óleo:</span>
                           <span className="text-green-600 font-black">✓ CONFORME</span>
                         </li>
                         <li className="flex justify-between text-[11px] font-bold">
-                          <span className="text-gray-400 italic">Pneus:</span> 
+                          <span className="text-gray-400 italic">Pneus:</span>
                           <span className="text-green-600 font-black">✓ CONFORME</span>
                         </li>
                         <li className="flex justify-between text-[11px] font-bold">
-                          <span className="text-gray-400 italic">Kit Emergência:</span> 
+                          <span className="text-gray-400 italic">Kit Emergência:</span>
                           <span className="text-green-600 font-black">✓ INSTALADO</span>
                         </li>
                     </ul>
                     <div className="bg-green-50 p-4 rounded-2xl text-[11px] font-bold text-green-700 border border-green-100 flex gap-3">
-                      <ShieldCheck className="w-4 h-4 shrink-0 text-green-400" /> 
+                      <ShieldCheck className="w-4 h-4 shrink-0 text-green-400" />
                       Vistoria realizada com sucesso
                     </div>
                   </div>
@@ -259,22 +296,22 @@ export default function VehicleExchangesPage() {
                     <span className="text-gray-500 uppercase tracking-widest">{selectedExchange.data}</span>
                   </div>
                </div>
-              
+
             </div>
 
             {/* Ações Fixas no Footer */}
             <div className="p-10 bg-white border-t border-gray-100 flex gap-6 shadow-[0_-20px_50px_rgba(0,0,0,0.08)] shrink-0">
-              <button 
-                onClick={() => handleRecusar(selectedExchange.id)}
+              <button
+                onClick={() => handleRecusar(selectedExchange)}
                 className="flex-1 py-5 text-xs font-black text-red-600 bg-red-50 hover:bg-red-100 rounded-[24px] transition-all border border-red-100 uppercase tracking-widest shadow-sm"
               >
                 Bloquear Operação
               </button>
-              <button 
-                onClick={() => handleAprovar(selectedExchange.id)}
+              <button
+                onClick={() => handleAprovar(selectedExchange)}
                 className="flex-[2] py-5 text-xs font-black text-white bg-brand-primary hover:bg-brand-primary/90 hover:-translate-y-1 active:translate-y-0 rounded-[24px] transition-all shadow-2xl shadow-brand-primary/30 uppercase tracking-[0.15em] flex items-center justify-center gap-4"
               >
-                <CheckCircle2 className="w-6 h-6 text-brand-secondary" /> 
+                <CheckCircle2 className="w-6 h-6 text-brand-secondary" />
                 Aprovar & Atribuir Ativos
               </button>
             </div>

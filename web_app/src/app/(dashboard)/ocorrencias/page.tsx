@@ -1,48 +1,22 @@
 "use client";
 
 import { AlertTriangle, MapPin, User, Truck, MessageSquare, CheckCircle, XCircle, Info, Camera, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/utils/supabase/client';
 
-const initialOccurrences = [
-  { 
-    id: 'OCC-9921', 
-    veiculo: 'ABC-1234', 
-    motorista: 'Roberto Alves', 
-    tipo: 'Mecânica (Motor)', 
-    gravidade: 'Grave', 
-    status: 'Aberta', 
-    data: '31/03/2026', 
-    hora: '10:15',
-    descricao: 'Superaquecimento do motor seguido de perda de potência na subida. O painel indicou erro de temperatura.',
-    local: 'Rodovia dos Bandeirantes, KM 42',
-  },
-  { 
-    id: 'OCC-9850', 
-    veiculo: 'XYZ-9876', 
-    motorista: 'Carlos Silva', 
-    tipo: 'Pneu Furado', 
-    gravidade: 'Leve', 
-    status: 'Em Tratativa', 
-    data: '31/03/2026', 
-    hora: '08:40',
-    descricao: 'Pneu traseiro esquerdo perfurado por objeto metálico. Motorista está em local seguro aguardando auxílio.',
-    local: 'Pátio Posto Graal',
-  },
-  { 
-    id: 'OCC-9721', 
-    veiculo: 'DEF-5555', 
-    motorista: 'Ana Souza', 
-    tipo: 'Pequena Avaria (Retrovisor)', 
-    gravidade: 'Média', 
-    status: 'Concluída', 
-    data: '30/03/2026', 
-    hora: '16:00',
-    descricao: 'Retrovisor direito quebrado após manobra em pátio de descarga. Peça já substituída.',
-    local: 'Centro de Distribuição Cajamar',
-  },
-];
-
-type Occ = typeof initialOccurrences[0];
+type Occ = {
+  id: string;
+  id_real: string;
+  veiculo: string;
+  motorista: string;
+  tipo: string;
+  gravidade: string;
+  status: string;
+  data: string;
+  hora: string;
+  descricao: string;
+  local: string;
+};
 
 const severityStyles: Record<string, string> = {
   'Grave': 'bg-red-100 text-red-700 border-red-200',
@@ -57,29 +31,81 @@ const statusStyles: Record<string, string> = {
 };
 
 export default function OccurrencesPage() {
-  const [occurrences, setOccurrences] = useState<Occ[]>(initialOccurrences);
+  const [occurrences, setOccurrences] = useState<Occ[]>([]);
   const [selectedOcc, setSelectedOcc] = useState<Occ | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  const fetchOccurrences = async () => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('ocorrencias')
+        .select('id, codigo, placa, motorista, categoria, gravidade, status, descricao, created_at')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setOccurrences(
+        (data || []).map((o) => ({
+          id: o.codigo || o.id,
+          id_real: o.id,
+          veiculo: o.placa || '',
+          motorista: o.motorista || '',
+          tipo: o.categoria || '',
+          gravidade: o.gravidade,
+          status: o.status,
+          data: new Date(o.created_at).toLocaleDateString('pt-BR'),
+          hora: new Date(o.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          descricao: o.descricao || '',
+          local: '',
+        }))
+      );
+    } catch {
+      setOccurrences([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchOccurrences();
+  }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3500);
   };
 
-  const handleEncaminhar = (occ: Occ) => {
-    setOccurrences((prev) =>
-      prev.map((o) => o.id === occ.id ? { ...o, status: 'Em Tratativa' } : o)
-    );
-    setSelectedOcc((prev) => prev?.id === occ.id ? { ...prev, status: 'Em Tratativa' } : prev);
-    showToast(`🔧 Ocorrência ${occ.id} encaminhada para oficina!`);
+  const handleEncaminhar = async (occ: Occ) => {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('ocorrencias')
+        .update({ status: 'Em Tratativa' })
+        .eq('id', occ.id_real);
+      if (error) throw error;
+      setOccurrences((prev) =>
+        prev.map((o) => o.id_real === occ.id_real ? { ...o, status: 'Em Tratativa' } : o)
+      );
+      setSelectedOcc((prev) => prev?.id_real === occ.id_real ? { ...prev, status: 'Em Tratativa' } : prev);
+      showToast(`🔧 Ocorrência ${occ.id} encaminhada para oficina!`);
+    } catch {
+      showToast('⚠️ Erro ao atualizar ocorrência.');
+    }
   };
 
-  const handleResolver = (occ: Occ) => {
-    setOccurrences((prev) =>
-      prev.map((o) => o.id === occ.id ? { ...o, status: 'Concluída' } : o)
-    );
-    setSelectedOcc(null);
-    showToast(`✅ Ocorrência ${occ.id} marcada como resolvida!`);
+  const handleResolver = async (occ: Occ) => {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('ocorrencias')
+        .update({ status: 'Concluída' })
+        .eq('id', occ.id_real);
+      if (error) throw error;
+      setOccurrences((prev) =>
+        prev.map((o) => o.id_real === occ.id_real ? { ...o, status: 'Concluída' } : o)
+      );
+      setSelectedOcc(null);
+      showToast(`✅ Ocorrência ${occ.id} marcada como resolvida!`);
+    } catch {
+      showToast('⚠️ Erro ao atualizar ocorrência.');
+    }
   };
 
   return (
@@ -138,8 +164,8 @@ export default function OccurrencesPage() {
           <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest pl-2">Timeline de Incidentes</h3>
           {occurrences.map((occ) => (
             <div
-              key={occ.id}
-              className={`bg-white p-6 rounded-2xl border transition-all cursor-pointer hover:shadow-lg ${selectedOcc?.id === occ.id ? 'border-brand-primary ring-2 ring-brand-primary/10' : 'border-gray-100'}`}
+              key={occ.id_real}
+              className={`bg-white p-6 rounded-2xl border transition-all cursor-pointer hover:shadow-lg ${selectedOcc?.id_real === occ.id_real ? 'border-brand-primary ring-2 ring-brand-primary/10' : 'border-gray-100'}`}
               onClick={() => setSelectedOcc(occ)}
             >
               <div className="flex items-start justify-between">

@@ -1,15 +1,8 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/utils/supabase/client';
 import { Truck, Users, Activity, Wrench, MoreVertical, Search, Plus, Filter, ArrowRight, X, CheckCircle, Eye } from 'lucide-react';
-
-const initialVehicles = [
-  { id: 1, placa: 'ABC-1234', modelo: 'Volvo FH 540', motorista: 'Roberto Alves', status: 'Em Rota', km: '124.500', carga: '40t' },
-  { id: 2, placa: 'XYZ-9876', modelo: 'Scania R450', motorista: 'Carlos Silva', status: 'Disponível', km: '88.200', carga: '35t' },
-  { id: 3, placa: 'DEF-5555', modelo: 'Mercedes Axor', motorista: 'Nenhum', status: 'Em Manutenção', km: '210.150', carga: '30t' },
-  { id: 4, placa: 'GHI-1111', modelo: 'DAF XF', motorista: 'Ana Souza', status: 'Em Rota', km: '45.000', carga: '42t' },
-  { id: 5, placa: 'JKL-4444', modelo: 'Iveco Stralis', motorista: 'Felipe Costa', status: 'Sinistrado', km: '112.000', carga: '28t' },
-];
 
 const statusStyles: Record<string, string> = {
   'Em Rota': 'bg-blue-100 text-blue-700 border-blue-200',
@@ -18,10 +11,18 @@ const statusStyles: Record<string, string> = {
   'Sinistrado': 'bg-red-100 text-red-700 border-red-200',
 };
 
-type Vehicle = typeof initialVehicles[0];
+type Vehicle = {
+  id: string | number;
+  placa: string;
+  modelo: string;
+  motorista: string;
+  status: string;
+  km: string;
+  carga: string;
+};
 
 export default function FleetPage() {
-  const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
@@ -32,6 +33,34 @@ export default function FleetPage() {
   const [newModelo, setNewModelo] = useState('');
   const [newMotorista, setNewMotorista] = useState('');
   const [newCarga, setNewCarga] = useState('');
+
+  const fetchVehicles = async () => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('veiculos')
+        .select('id, placa, modelo, motorista, status, km_atual, capacidade_carga')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setVehicles(
+        (data || []).map((v) => ({
+          id: v.id,
+          placa: v.placa,
+          modelo: v.modelo,
+          motorista: v.motorista ?? 'Nenhum',
+          status: v.status,
+          km: v.km_atual?.toLocaleString('pt-BR') ?? '0',
+          carga: v.capacidade_carga ?? 'N/A',
+        }))
+      );
+    } catch {
+      setVehicles([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchVehicles();
+  }, []);
 
   const filtered = vehicles.filter(
     (v) =>
@@ -45,24 +74,28 @@ export default function FleetPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleCadastrar = () => {
+  const handleCadastrar = async () => {
     if (!newPlaca || !newModelo) {
       showToast('⚠️ Placa e Modelo são obrigatórios.');
       return;
     }
-    const novo: Vehicle = {
-      id: vehicles.length + 1,
-      placa: newPlaca.toUpperCase(),
-      modelo: newModelo,
-      motorista: newMotorista || 'Nenhum',
-      status: 'Disponível',
-      km: '0',
-      carga: newCarga || 'N/A',
-    };
-    setVehicles([novo, ...vehicles]);
-    setIsModalOpen(false);
-    setNewPlaca(''); setNewModelo(''); setNewMotorista(''); setNewCarga('');
-    showToast('✅ Veículo cadastrado com sucesso!');
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from('veiculos').insert({
+        placa: newPlaca.toUpperCase(),
+        modelo: newModelo,
+        motorista: newMotorista || null,
+        status: 'Disponível',
+        capacidade_carga: newCarga || null,
+      });
+      if (error) throw error;
+      await fetchVehicles();
+      setIsModalOpen(false);
+      setNewPlaca(''); setNewModelo(''); setNewMotorista(''); setNewCarga('');
+      showToast('✅ Veículo cadastrado com sucesso!');
+    } catch {
+      showToast('⚠️ Erro ao cadastrar veículo.');
+    }
   };
 
   return (
