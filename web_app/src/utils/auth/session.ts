@@ -6,6 +6,7 @@ export interface SessionUser {
   email: string
   perfil: UserPerfil
   nome: string
+  sv?: number
 }
 
 export function getSessionFromRequest(request: NextRequest): SessionUser | null {
