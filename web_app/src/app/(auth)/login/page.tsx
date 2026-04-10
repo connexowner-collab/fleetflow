@@ -2,7 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/utils/supabase/client';
+
+const USERS = [
+  { email: 'admin@fleetflow.com.br', password: 'fleetflow123' },
+  { email: 'teste@fleetflow.com.br', password: 'fleetflow123' },
+];
 
 export default function Login() {
   const router = useRouter();
@@ -30,15 +34,18 @@ export default function Login() {
     setErrors({});
     setLoading(true);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const user = USERS.find(
+      (u) => u.email === email.trim().toLowerCase() && u.password === password
+    );
 
-    setLoading(false);
-
-    if (error) {
+    if (!user) {
+      setLoading(false);
       setErrors({ password: 'E-mail ou senha incorretos. Verifique suas credenciais.' });
       return;
     }
+
+    // Grava sessão simples via cookie
+    document.cookie = `fleetflow-session=${btoa(user.email)}; path=/; max-age=${60 * 60 * 8}`;
 
     router.push('/');
     router.refresh();
