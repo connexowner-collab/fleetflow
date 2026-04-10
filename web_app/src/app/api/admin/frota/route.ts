@@ -28,14 +28,8 @@ export async function GET() {
       docs = docData ?? []
     }
 
-    const veiculos = (data ?? []).map((v: {
-      id: string; placa: string; modelo: string; marca: string | null; tipo: string | null;
-      capacidade: string | null; combustivel: string | null; cor: string | null;
-      renavam: string | null; chassi: string | null; filial: string | null;
-      ano_fabricacao: number | null; ano_modelo: number | null; km_atual: number | null;
-      status: string; device_id: string | null; created_at: string;
-      profiles?: { nome?: string } | null;
-    }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const veiculos = (data ?? []).map((v: any) => {
       const veiculoDocs = docs.filter(d => d.veiculo_id === v.id)
       const docStatus = calcDocStatus(veiculoDocs)
       return { ...v, documentos: veiculoDocs, doc_status: docStatus }
