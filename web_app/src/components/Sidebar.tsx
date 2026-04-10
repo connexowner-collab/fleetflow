@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Truck, ClipboardCheck, AlertTriangle, Settings, LogOut, Users, ArrowLeftRight, X } from 'lucide-react';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 interface SidebarProps {
   open: boolean;
@@ -11,16 +12,20 @@ interface SidebarProps {
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const user = useCurrentUser();
+  const perfil = user?.perfil ?? 'motorista';
 
-  const navItems = [
-    { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/frota', label: 'Gestão da Frota', icon: Truck },
-    { href: '/checklists', label: 'Checklists', icon: ClipboardCheck },
-    { href: '/ocorrencias', label: 'Ocorrências', icon: AlertTriangle },
-    { href: '/admin/users', label: 'Gestão de Acessos', icon: Users },
-    { href: '/admin/trocas', label: 'Aprovações de Troca', icon: ArrowLeftRight },
-    { href: '/configuracoes', label: 'Configurações', icon: Settings },
+  const allNavItems = [
+    { href: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['gestor', 'diretor', 'analista', 'motorista'] },
+    { href: '/frota', label: 'Gestão da Frota', icon: Truck, roles: ['gestor', 'diretor', 'analista'] },
+    { href: '/checklists', label: 'Checklists', icon: ClipboardCheck, roles: ['gestor', 'diretor', 'analista', 'motorista'] },
+    { href: '/ocorrencias', label: 'Ocorrências', icon: AlertTriangle, roles: ['gestor', 'diretor', 'analista', 'motorista'] },
+    { href: '/admin/users', label: 'Gestão de Acessos', icon: Users, roles: ['gestor', 'diretor'] },
+    { href: '/admin/trocas', label: 'Aprovações de Troca', icon: ArrowLeftRight, roles: ['gestor', 'diretor', 'analista'] },
+    { href: '/configuracoes', label: 'Configurações', icon: Settings, roles: ['gestor', 'diretor'] },
   ];
+
+  const navItems = allNavItems.filter(item => item.roles.includes(perfil));
 
   return (
     <>
@@ -78,10 +83,22 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         <div className="p-4 border-t border-sidebar-fg/10 mt-auto">
-          <Link href="/login" className="flex items-center space-x-3 px-4 py-3 w-full rounded-lg hover:bg-sidebar-fg/5 transition-colors text-sidebar-fg/80 hover:text-red-400">
+          {user && (
+            <div className="px-4 py-2 mb-2">
+              <p className="text-xs text-sidebar-fg/50 truncate">{user.nome || user.email}</p>
+              <p className="text-xs text-brand-secondary capitalize">{user.perfil}</p>
+            </div>
+          )}
+          <button
+            onClick={async () => {
+              await fetch('/api/auth/login', { method: 'DELETE' });
+              window.location.href = '/login';
+            }}
+            className="flex items-center space-x-3 px-4 py-3 w-full rounded-lg hover:bg-sidebar-fg/5 transition-colors text-sidebar-fg/80 hover:text-red-400"
+          >
             <LogOut className="w-5 h-5" />
             <span>Sair</span>
-          </Link>
+          </button>
         </div>
       </div>
     </>

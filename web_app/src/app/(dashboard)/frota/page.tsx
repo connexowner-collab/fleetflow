@@ -6,6 +6,7 @@ import {
   Eye, Pencil, Trash2, AlertTriangle, FileText, ClipboardList,
   ChevronDown, Calendar, Save, ExternalLink
 } from 'lucide-react';
+import { useCurrentUser, canDeleteVehicle, canManageFleet } from '@/hooks/useCurrentUser';
 
 // ── Tipos ─────────────────────────────────────────────────
 
@@ -135,9 +136,14 @@ function calcDocStatus(docs: { data_vencimento: string | null }[]): DocStatus {
 // ── Componente Principal ─────────────────────────────────
 
 export default function FleetPage() {
+  const currentUser = useCurrentUser()
+  const userPerfil = currentUser?.perfil ?? 'motorista'
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [filiais, setFiliais] = useState<string[]>([])
   const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<string[]>([])
+  const [filterDoc, setFilterDoc] = useState<string[]>([])
+  const [filterFilial, setFilterFilial] = useState('')
   const [loading, setLoading] = useState(true)
 
   // Modais de CRUD
@@ -168,6 +174,23 @@ export default function FleetPage() {
   const [saving, setSaving] = useState(false)
 
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+
+  // Importação em lote
+  type ImportError = { row: number; erros: string[] }
+  type ImportResult = {
+    ok: boolean
+    totalRows?: number
+    validCount?: number
+    errorCount?: number
+    errors?: ImportError[]
+    validRows?: Record<string, unknown>[]
+    imported?: number
+  }
+  const [importModalOpen, setImportModalOpen] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const [importing, setImporting] = useState(false)
+  const importFileRef = useRef<HTMLInputElement>(null)
 
   // ── Fetch ──────────────────────────────────────────────
 
@@ -318,16 +341,74 @@ export default function FleetPage() {
     finally { setChecklistsLoading(false) }
   }
 
+  // ── Importação em lote ────────────────────────────────
+
+  const handleImportUpload = async () => {
+    if (!importFile) return
+    setImporting(true)
+    setImportResult(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', importFile)
+      const res = await fetch('/api/admin/frota/importar', { method: 'POST', body: fd })
+      const json: ImportResult = await res.json()
+      setImportResult(json)
+      if (json.ok) {
+        await fetchVehicles()
+        showToast(`✅ ${json.imported} veículo(s) importado(s) com sucesso!`)
+        setImportModalOpen(false)
+        setImportFile(null)
+        setImportResult(null)
+      }
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Erro ao importar.', 'error')
+    } finally { setImporting(false) }
+  }
+
+  const handleImportConfirmPartial = async () => {
+    if (!importResult?.validRows?.length) return
+    setImporting(true)
+    try {
+      const res = await fetch('/api/admin/frota/importar', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ validRows: importResult.validRows }),
+      })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
+      await fetchVehicles()
+      showToast(`✅ ${json.imported} veículo(s) importado(s) com sucesso!`)
+      setImportModalOpen(false)
+      setImportFile(null)
+      setImportResult(null)
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Erro ao importar.', 'error')
+    } finally { setImporting(false) }
+  }
+
   // ── Filtros ────────────────────────────────────────────
 
-  const filtered = vehicles.filter(v =>
-    !search ||
-    v.placa.toLowerCase().includes(search.toLowerCase()) ||
-    v.modelo.toLowerCase().includes(search.toLowerCase()) ||
-    (v.marca ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (v.profiles?.nome ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (v.filial ?? '').toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = vehicles.filter(v => {
+    if (search) {
+      const q = search.toLowerCase()
+      const match = v.placa.toLowerCase().includes(q) ||
+        v.modelo.toLowerCase().includes(q) ||
+        (v.marca ?? '').toLowerCase().includes(q) ||
+        (v.profiles?.nome ?? '').toLowerCase().includes(q) ||
+        (v.filial ?? '').toLowerCase().includes(q)
+      if (!match) return false
+    }
+    if (filterStatus.length > 0 && !filterStatus.includes(v.status)) return false
+    if (filterDoc.length > 0 && !filterDoc.includes(v.doc_status)) return false
+    if (filterFilial && v.filial !== filterFilial) return false
+    return true
+  })
+
+  const toggleFilter = (list: string[], setList: (v: string[]) => void, val: string) => {
+    setList(list.includes(val) ? list.filter(x => x !== val) : [...list, val])
+  }
+
+  const hasFilters = filterStatus.length > 0 || filterDoc.length > 0 || !!filterFilial
 
   const stats = [
     { label: 'Total Veículos',  value: vehicles.length,                                                icon: Truck,    color: 'text-brand-primary' },
@@ -356,10 +437,27 @@ export default function FleetPage() {
           </h1>
           <p className="text-gray-500 mt-1">Cadastre, edite e monitore todos os veículos da operação.</p>
         </div>
-        <button onClick={openCadastro}
-          className="bg-brand-primary hover:bg-brand-primary/90 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-brand-primary/20 flex items-center transition-all active:scale-95">
-          <Plus className="w-5 h-5 mr-2" />Novo Veículo
-        </button>
+        {canManageFleet(userPerfil) && (
+          <div className="flex gap-3">
+            <button
+              onClick={() => window.open('/api/admin/frota/importar', '_blank')}
+              className="border border-brand-primary text-brand-primary hover:bg-brand-primary/5 px-5 py-3 rounded-xl font-bold flex items-center transition-all active:scale-95 text-sm"
+              title="Baixar template e importar veículos em lote"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />Template
+            </button>
+            <button
+              onClick={() => { setImportModalOpen(true); setImportFile(null); setImportResult(null) }}
+              className="border border-brand-primary text-brand-primary hover:bg-brand-primary/5 px-5 py-3 rounded-xl font-bold flex items-center transition-all active:scale-95 text-sm"
+            >
+              <Plus className="w-4 h-4 mr-2" />Importar
+            </button>
+            <button onClick={openCadastro}
+              className="bg-brand-primary hover:bg-brand-primary/90 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-brand-primary/20 flex items-center transition-all active:scale-95">
+              <Plus className="w-5 h-5 mr-2" />Novo Veículo
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -377,12 +475,58 @@ export default function FleetPage() {
 
       {/* Tabela */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-50 flex gap-4 items-center">
-          <div className="relative flex-1 max-w-md">
+        <div className="p-4 border-b border-gray-50 space-y-3">
+          {/* Search */}
+          <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Buscar por placa, modelo, marca, motorista..."
               className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-transparent rounded-lg focus:bg-white focus:border-brand-primary outline-none text-sm" />
+          </div>
+          {/* Filtros */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Filtrar:</span>
+            {/* Status */}
+            {(['Ativo','Disponível','Em Rota','Em Manutenção','Inativo'] as string[]).map(s => (
+              <button key={s} onClick={() => toggleFilter(filterStatus, setFilterStatus, s)}
+                className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+                  filterStatus.includes(s)
+                    ? `${statusStyles[s]} shadow-sm`
+                    : 'bg-gray-50 text-gray-500 border-gray-200 hover:border-gray-300'
+                }`}>
+                {s}
+              </button>
+            ))}
+            <div className="w-px h-4 bg-gray-200" />
+            {/* Documentação */}
+            {(['ok','alerta','vencido','sem-data'] as DocStatus[]).map(d => (
+              <button key={d} onClick={() => toggleFilter(filterDoc, setFilterDoc, d)}
+                className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+                  filterDoc.includes(d)
+                    ? `${docBadge[d].cls} shadow-sm`
+                    : 'bg-gray-50 text-gray-500 border-gray-200 hover:border-gray-300'
+                }`}>
+                Docs: {docBadge[d].label}
+              </button>
+            ))}
+            {/* Filial */}
+            {filiais.length > 0 && (
+              <>
+                <div className="w-px h-4 bg-gray-200" />
+                <select value={filterFilial} onChange={e => setFilterFilial(e.target.value)}
+                  className="px-3 py-1 rounded-full text-xs font-bold border bg-gray-50 text-gray-500 border-gray-200 outline-none hover:border-gray-300 cursor-pointer">
+                  <option value="">Todas as filiais</option>
+                  {filiais.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </>
+            )}
+            {/* Limpar */}
+            {hasFilters && (
+              <button onClick={() => { setFilterStatus([]); setFilterDoc([]); setFilterFilial('') }}
+                className="px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-all flex items-center gap-1">
+                <X className="w-3 h-3" />Limpar filtros
+              </button>
+            )}
           </div>
         </div>
 
@@ -482,7 +626,9 @@ export default function FleetPage() {
                         <button onClick={() => openEditar(v)} className="p-2 text-gray-400 hover:text-blue-600 transition-colors" title="Editar"><Pencil className="w-4 h-4" /></button>
                         <button onClick={() => openChecklistDrawer(v)} className="p-2 text-gray-400 hover:text-purple-600 transition-colors" title="Histórico de Checklist"><ClipboardList className="w-4 h-4" /></button>
                         <button onClick={() => openDocsDrawer(v)} className="p-2 text-gray-400 hover:text-orange-500 transition-colors" title="Documentos"><FileText className="w-4 h-4" /></button>
-                        <button onClick={() => setDeleteTarget(v)} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Excluir"><Trash2 className="w-4 h-4" /></button>
+                        {canDeleteVehicle(userPerfil) && (
+                          <button onClick={() => setDeleteTarget(v)} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Excluir"><Trash2 className="w-4 h-4" /></button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -767,6 +913,133 @@ export default function FleetPage() {
               <button onClick={() => setDeleteTarget(null)} className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-bold text-gray-700 hover:bg-gray-50">Cancelar</button>
               <button onClick={handleExcluir} className="flex-1 py-3 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700">Sim, excluir</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Importação ──────────────────────────────── */}
+      {importModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={() => !importing && setImportModalOpen(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-8 z-10 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <h2 className="text-lg font-black text-gray-900">Importar Veículos em Lote</h2>
+                <p className="text-sm text-gray-500">Selecione um arquivo .xlsx com os dados dos veículos.</p>
+              </div>
+              <button onClick={() => setImportModalOpen(false)} disabled={importing} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {!importResult ? (
+              <div className="space-y-6">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-700">
+                  <p className="font-bold mb-1">Colunas obrigatórias:</p>
+                  <p className="font-mono text-xs">placa · modelo · marca · tipo · combustivel · cor · renavam · chassi · filial · ano_fabricacao · ano_modelo</p>
+                  <p className="mt-2">Opcional: capacidade · device_id</p>
+                  <button
+                    onClick={() => window.open('/api/admin/frota/importar', '_blank')}
+                    className="mt-3 inline-flex items-center text-blue-600 hover:underline text-xs font-bold"
+                  >
+                    <ExternalLink className="w-3 h-3 mr-1" />Baixar template .xlsx
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Arquivo .xlsx</label>
+                  <div
+                    className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-brand-primary/50 transition-colors"
+                    onClick={() => importFileRef.current?.click()}
+                  >
+                    {importFile ? (
+                      <div>
+                        <p className="font-bold text-gray-800">{importFile.name}</p>
+                        <p className="text-sm text-gray-500">{(importFile.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <FileText className="w-10 h-10 mx-auto text-gray-300 mb-2" />
+                        <p className="text-gray-500 text-sm">Clique para selecionar ou arraste o arquivo</p>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={importFileRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={e => setImportFile(e.target.files?.[0] ?? null)}
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button onClick={() => setImportModalOpen(false)} className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-bold text-gray-700 hover:bg-gray-50">Cancelar</button>
+                  <button
+                    onClick={handleImportUpload}
+                    disabled={!importFile || importing}
+                    className="flex-1 py-3 rounded-xl bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {importing ? 'Validando...' : 'Validar e Importar'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Resumo */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-gray-50 rounded-xl p-4 text-center">
+                    <p className="text-2xl font-black text-gray-900">{importResult.totalRows ?? 0}</p>
+                    <p className="text-xs text-gray-500 mt-1">Total de linhas</p>
+                  </div>
+                  <div className="bg-green-50 rounded-xl p-4 text-center">
+                    <p className="text-2xl font-black text-green-700">{importResult.validCount ?? 0}</p>
+                    <p className="text-xs text-green-600 mt-1">Válidas</p>
+                  </div>
+                  <div className="bg-red-50 rounded-xl p-4 text-center">
+                    <p className="text-2xl font-black text-red-700">{importResult.errorCount ?? 0}</p>
+                    <p className="text-xs text-red-600 mt-1">Com erros</p>
+                  </div>
+                </div>
+
+                {/* Erros */}
+                {importResult.errors && importResult.errors.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-bold text-red-700 mb-3">Linhas com erros:</h3>
+                    <div className="max-h-48 overflow-y-auto space-y-2">
+                      {importResult.errors.map(e => (
+                        <div key={e.row} className="bg-red-50 border border-red-200 rounded-lg p-3">
+                          <p className="text-xs font-bold text-red-700">Linha {e.row}</p>
+                          <ul className="mt-1 space-y-0.5">
+                            {e.erros.map((msg, i) => (
+                              <li key={i} className="text-xs text-red-600">• {msg}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setImportResult(null); setImportFile(null) }}
+                    className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-bold text-gray-700 hover:bg-gray-50"
+                  >
+                    Voltar
+                  </button>
+                  {(importResult.validCount ?? 0) > 0 && (
+                    <button
+                      onClick={handleImportConfirmPartial}
+                      disabled={importing}
+                      className="flex-1 py-3 rounded-xl bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary/90 disabled:opacity-50"
+                    >
+                      {importing ? 'Importando...' : `Importar ${importResult.validCount} válida(s)`}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
