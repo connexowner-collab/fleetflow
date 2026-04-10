@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getSessionFromRequest, canManageFleet } from '@/utils/auth/session'
 
 export async function GET() {
   const supabase = createAdminClient()
@@ -41,7 +42,11 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const session = getSessionFromRequest(request)
+  if (!session || !canManageFleet(session.perfil)) {
+    return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 403 })
+  }
   const supabase = createAdminClient()
   const body = await request.json()
   const {
@@ -117,7 +122,11 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
+  const session = getSessionFromRequest(request)
+  if (!session || !canManageFleet(session.perfil)) {
+    return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 403 })
+  }
   const supabase = createAdminClient()
   const body = await request.json()
   const { id, placa, renavam, chassi, ...rest } = body
@@ -166,7 +175,11 @@ export async function PATCH(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
+  const session = getSessionFromRequest(request)
+  if (!session || !canManageFleet(session.perfil)) {
+    return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 403 })
+  }
   const supabase = createAdminClient()
   const { id } = await request.json()
 

@@ -3,11 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-const USERS = [
-  { email: 'admin@fleetflow.com.br', password: 'fleetflow123' },
-  { email: 'teste@fleetflow.com.br', password: 'fleetflow123' },
-];
-
 export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -27,33 +22,34 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs = validate();
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      return;
-    }
+    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     setErrors({});
     setLoading(true);
 
-    const user = USERS.find(
-      (u) => u.email === email.trim().toLowerCase() && u.password === password
-    );
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+      });
+      const json = await res.json();
 
-    if (!user) {
+      if (!res.ok || json.error) {
+        setErrors({ password: json.error ?? 'E-mail ou senha incorretos.' });
+        return;
+      }
+
+      router.push('/');
+      router.refresh();
+    } catch {
+      setErrors({ password: 'Erro de conexão. Tente novamente.' });
+    } finally {
       setLoading(false);
-      setErrors({ password: 'E-mail ou senha incorretos. Verifique suas credenciais.' });
-      return;
     }
-
-    // Grava sessão simples via cookie
-    document.cookie = `fleetflow-session=${btoa(user.email)}; path=/; max-age=${60 * 60 * 8}`;
-
-    router.push('/');
-    router.refresh();
   };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row w-full">
-      {/* Left Form Side */}
       <div className="w-full md:w-1/2 flex flex-col justify-center items-center p-8 bg-white shadow-2xl z-10">
         <div className="w-full max-w-md space-y-8">
           <div className="flex flex-col items-center">
@@ -70,69 +66,46 @@ export default function Login() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">E-mail Corporativo</label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={`mt-1 block w-full px-4 py-3 border rounded-lg shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm transition-all outline-none ${errors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
-                  placeholder="gestor@empresa.com.br"
-                />
+                <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  className={`mt-1 block w-full px-4 py-3 border rounded-lg shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm outline-none ${errors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                  placeholder="gestor@empresa.com.br" />
                 {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Senha</label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`mt-1 block w-full px-4 py-3 border rounded-lg shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm transition-all outline-none ${errors.password ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
-                  placeholder="••••••••"
-                />
+                <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)}
+                  className={`mt-1 block w-full px-4 py-3 border rounded-lg shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm outline-none ${errors.password ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                  placeholder="••••••••" />
                 {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password}</p>}
               </div>
             </div>
 
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <input id="remember-me" name="remember-me" type="checkbox" className="h-4 w-4 text-brand-primary focus:ring-brand-primary border-gray-300 rounded" />
+                <input id="remember-me" type="checkbox" className="h-4 w-4 text-brand-primary border-gray-300 rounded" />
                 <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">Manter conectado</label>
               </div>
-              <div className="text-sm">
-                <button
-                  type="button"
-                  onClick={() => alert('Recuperação de senha: entre em contato com seu administrador.')}
-                  className="font-medium text-brand-primary hover:text-brand-primary/80"
-                >
-                  Esqueceu a senha?
-                </button>
-              </div>
+              <button type="button" onClick={() => alert('Entre em contato com seu administrador.')}
+                className="text-sm font-medium text-brand-primary hover:text-brand-primary/80">
+                Esqueceu a senha?
+              </button>
             </div>
 
-            <button
-              id="btn-entrar"
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-brand-primary hover:bg-brand-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-all disabled:opacity-70 disabled:cursor-not-allowed"
-            >
+            <button id="btn-entrar" type="submit" disabled={loading}
+              className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-brand-primary hover:bg-brand-primary/90 focus:outline-none transition-all disabled:opacity-70 disabled:cursor-not-allowed">
               {loading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Autenticando...
-                </>
+                <><svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>Autenticando...</>
               ) : 'Entrar no Sistema'}
             </button>
           </form>
         </div>
       </div>
 
-      {/* Right Art Side */}
       <div className="hidden md:flex flex-1 bg-brand-primary relative overflow-hidden items-center justify-center">
-        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
+        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }} />
         <div className="z-10 text-center px-12">
           <h1 className="text-5xl font-extrabold text-white tracking-tight mb-4 drop-shadow-lg">Gestão de Frota Segura</h1>
           <p className="text-white/70 text-lg max-w-lg mx-auto leading-relaxed">
