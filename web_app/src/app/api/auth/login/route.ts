@@ -10,6 +10,18 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient()
 
+  // G4.2: Check profile exists and is active before auth attempt
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, perfil, nome, ativo, session_version, deleted_at')
+    .eq('email', email.trim().toLowerCase())
+    .is('deleted_at', null)
+    .single()
+
+  if (profile?.ativo === false) {
+    return NextResponse.json({ error: 'Usuário inativo. Contate o administrador.' }, { status: 401 })
+  }
+
   // Authenticate via Supabase Auth
   const { createClient } = await import('@supabase/supabase-js')
   const authClient = createClient(
@@ -26,18 +38,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'E-mail ou senha incorretos.' }, { status: 401 })
   }
 
-  // Fetch perfil from profiles table using admin client
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('perfil, nome')
-    .eq('email', email.trim().toLowerCase())
-    .single()
-
   const perfil = profile?.perfil ?? 'motorista'
   const nome = profile?.nome ?? email
+  const sv = profile?.session_version ?? 0
 
+  // G4.3: Include session_version in cookie to enable invalidation
   const sessionData = Buffer.from(
-    JSON.stringify({ email: email.trim().toLowerCase(), perfil, nome })
+    JSON.stringify({ email: email.trim().toLowerCase(), perfil, nome, sv })
   ).toString('base64')
 
   const response = NextResponse.json({ ok: true, perfil, nome })

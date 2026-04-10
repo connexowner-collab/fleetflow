@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 
@@ -10,6 +11,22 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const router = useRouter();
+
+  // G4.3: Verify session validity on every dashboard mount.
+  // Handles immediate invalidation when user is deactivated/deleted.
+  useEffect(() => {
+    fetch('/api/auth/check')
+      .then(r => r.json())
+      .then(data => {
+        if (!data.valid) {
+          fetch('/api/auth/login', { method: 'DELETE' }).finally(() => {
+            router.push('/login')
+          })
+        }
+      })
+      .catch(() => {}) // network errors don't log out the user
+  }, [router])
 
   return (
     <div className="flex bg-background text-foreground h-full w-full overflow-hidden">
