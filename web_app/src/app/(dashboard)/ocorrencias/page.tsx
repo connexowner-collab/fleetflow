@@ -40,7 +40,7 @@ export default function OccurrencesPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from('ocorrencias')
-        .select('id, codigo, placa, motorista, categoria, gravidade, status, descricao, created_at')
+        .select('id, codigo, placa, motorista_nome, categoria, gravidade, status, descricao, local, created_at')
         .order('created_at', { ascending: false });
       if (error) throw error;
       setOccurrences(
@@ -48,7 +48,7 @@ export default function OccurrencesPage() {
           id: o.codigo || o.id,
           id_real: o.id,
           veiculo: o.placa || '',
-          motorista: o.motorista || '',
+          motorista: o.motorista_nome || '',
           tipo: o.categoria || '',
           gravidade: o.gravidade,
           status: o.status,

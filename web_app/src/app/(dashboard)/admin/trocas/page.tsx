@@ -28,16 +28,16 @@ export default function VehicleExchangesPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from('trocas')
-        .select('id, codigo, motorista, veiculo_antigo, veiculo_novo, status, motivo, created_at')
+        .select('id, codigo, motorista_nome, veiculo_antigo_nome, veiculo_novo_nome, status, motivo, created_at')
         .order('created_at', { ascending: false });
       if (error) throw error;
       setExchanges(
         (data || []).map((t) => ({
           id: t.codigo || t.id,
           id_real: t.id,
-          motorista: t.motorista || '',
-          de: t.veiculo_antigo || '',
-          para: t.veiculo_novo || '',
+          motorista: t.motorista_nome || '',
+          de: t.veiculo_antigo_nome || '',
+          para: t.veiculo_novo_nome || '',
           data:
             new Date(t.created_at).toLocaleDateString('pt-BR') +
             ', ' +

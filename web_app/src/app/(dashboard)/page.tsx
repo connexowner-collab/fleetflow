@@ -18,18 +18,21 @@ export default function Dashboard() {
     const supabase = createClient();
 
     async function load() {
-      const [veicRes, ocRes] = await Promise.all([
-        supabase.from('veiculos').select('id, status'),
-        supabase.from('ocorrencias').select('id, codigo, placa, motorista, gravidade, status, created_at').order('created_at', { ascending: false }).limit(6),
+      const [metricsRes, ocRes] = await Promise.all([
+        fetch('/api/dashboard').then((r) => r.json()),
+        supabase
+          .from('ocorrencias')
+          .select('id, codigo, placa, motorista_nome, gravidade, status, created_at')
+          .order('created_at', { ascending: false })
+          .limit(6),
       ]);
 
-      const veics = veicRes.data ?? [];
       setMetrics({
-        totalVeiculos: veics.length,
-        emManutencao: veics.filter((v) => v.status === 'Em Manutenção').length,
-        ocorrenciasAtivas: (ocRes.data ?? []).filter((o) => o.status === 'Aberta' || o.status === 'Em Tratativa').length,
-        gravesNaoTratadas: (ocRes.data ?? []).filter((o) => o.gravidade === 'Grave' && o.status === 'Aberta').length,
-        trocasPendentes: 0,
+        totalVeiculos: metricsRes.totalVeiculos ?? 0,
+        emManutencao: metricsRes.emManutencao ?? 0,
+        ocorrenciasAtivas: metricsRes.ocorrenciasAtivas ?? 0,
+        gravesNaoTratadas: metricsRes.gravesNaoTratadas ?? 0,
+        trocasPendentes: metricsRes.trocasPendentes ?? 0,
       });
 
       const gravBadge: Record<string, string> = { Grave: 'bg-red-100 text-red-700', Média: 'bg-yellow-100 text-yellow-700', Leve: 'bg-green-100 text-green-700' };
@@ -37,7 +40,7 @@ export default function Dashboard() {
         (ocRes.data ?? []).map((o) => ({
           id: o.codigo ?? o.id,
           placa: o.placa ?? '',
-          motorista: o.motorista ?? '',
+          motorista: o.motorista_nome ?? '',
           gravidade: o.gravidade,
           data: new Date(o.created_at).toLocaleDateString('pt-BR'),
           badgeClass: gravBadge[o.gravidade] ?? 'bg-gray-100 text-gray-700',
@@ -232,33 +235,34 @@ export default function Dashboard() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-6">Central de Tarefas</h2>
           <div className="space-y-4">
-            <div className="p-4 border border-yellow-200 bg-yellow-50 rounded-xl relative overflow-hidden">
-              <div className="absolute left-0 top-0 bottom-0 w-1 bg-yellow-400"></div>
-              <h4 className="font-bold text-yellow-900 text-sm mb-1">Orçamento Aguardando Aprovação</h4>
-              <p className="text-xs text-yellow-800 mb-3">Placa XYZ-9876 (R$ 1.450,00) excedeu teto de analista.</p>
-              <button
-                onClick={() => showToast('💰 Redirecionando para análise de orçamento...')}
-                className="text-xs font-bold bg-yellow-400 hover:bg-yellow-500 text-yellow-900 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-              >
-                Analisar
-              </button>
-            </div>
+            {metrics.gravesNaoTratadas > 0 && (
+              <a href="/ocorrencias" className="block p-4 border border-red-200 bg-red-50 rounded-xl relative overflow-hidden hover:bg-red-100 transition-colors">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500"></div>
+                <h4 className="font-bold text-red-900 text-sm mb-1">Ocorrências Graves sem Tratativa</h4>
+                <p className="text-xs text-red-700">{metrics.gravesNaoTratadas} {metrics.gravesNaoTratadas === 1 ? 'ocorrência grave aguarda' : 'ocorrências graves aguardam'} encaminhamento.</p>
+              </a>
+            )}
 
-            <div
-              className="p-4 border border-gray-100 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
-              onClick={() => showToast('📋 Abrindo auditoria de checklists...')}
-            >
-              <h4 className="font-bold text-gray-800 text-sm mb-1">Auditoria de Checklists</h4>
-              <p className="text-xs text-gray-500">12 checklists diários reportaram ausência de estepe ontem.</p>
-            </div>
+            {metrics.trocasPendentes > 0 && (
+              <a href="/admin/trocas" className="block p-4 border border-yellow-200 bg-yellow-50 rounded-xl relative overflow-hidden hover:bg-yellow-100 transition-colors">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-yellow-400"></div>
+                <h4 className="font-bold text-yellow-900 text-sm mb-1">Aprovações de Troca Pendentes</h4>
+                <p className="text-xs text-yellow-800">{metrics.trocasPendentes} {metrics.trocasPendentes === 1 ? 'solicitação aguarda' : 'solicitações aguardam'} sua aprovação.</p>
+              </a>
+            )}
 
-            <div
-              className="p-4 border border-gray-100 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
-              onClick={() => showToast('⚙️ Redirecionando para configurações do tenant...')}
-            >
-              <h4 className="font-bold text-gray-800 text-sm mb-1">Configurar Gestão de Frota Segura</h4>
-              <p className="text-xs text-gray-500">A nova empresa 'LogisticaPro' ainda não configurou as cores.</p>
-            </div>
+            {metrics.emManutencao > 0 && (
+              <a href="/frota" className="block p-4 border border-blue-200 bg-blue-50 rounded-xl relative overflow-hidden hover:bg-blue-100 transition-colors">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-400"></div>
+                <h4 className="font-bold text-blue-900 text-sm mb-1">Veículos em Manutenção</h4>
+                <p className="text-xs text-blue-700">{metrics.emManutencao} {metrics.emManutencao === 1 ? 'veículo está' : 'veículos estão'} nas oficinas credenciadas.</p>
+              </a>
+            )}
+
+            <a href="/checklists" className="block p-4 border border-gray-100 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+              <h4 className="font-bold text-gray-800 text-sm mb-1">Central de Inspeções Diárias</h4>
+              <p className="text-xs text-gray-500">Valide e libere os checklists recebidos pelo aplicativo.</p>
+            </a>
           </div>
         </div>
       </div>
