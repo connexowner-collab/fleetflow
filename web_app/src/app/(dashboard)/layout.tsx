@@ -20,12 +20,16 @@ export default function DashboardLayout({
       .then(r => r.json())
       .then(data => {
         if (!data.valid) {
-          fetch('/api/auth/login', { method: 'DELETE' }).finally(() => {
-            router.push('/login')
-          })
+          if (process.env.NODE_ENV === 'development') {
+            window.location.href = '/api/auth/dev-login'
+          } else {
+            fetch('/api/auth/login', { method: 'DELETE' }).finally(() => {
+              router.push('/login')
+            })
+          }
         }
       })
-      .catch(() => {}) // network errors don't log out the user
+      .catch(() => {})
   }, [router])
 
   return (
