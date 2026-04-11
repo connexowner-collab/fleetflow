@@ -1,16 +1,10 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function Login() {
   const router = useRouter();
-
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      window.location.href = '/api/auth/dev-login'
-    }
-  }, []);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

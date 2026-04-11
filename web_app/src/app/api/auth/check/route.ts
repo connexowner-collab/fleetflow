@@ -9,16 +9,7 @@ import { getSessionFromRequest } from '@/utils/auth/session'
 export async function GET(request: NextRequest) {
   const session = getSessionFromRequest(request)
   if (!session) {
-    // DEV: auto-redirect to dev-login instead of invalidating
-    if (process.env.NODE_ENV === 'development') {
-      return NextResponse.json({ valid: true, dev: true })
-    }
     return NextResponse.json({ valid: false }, { status: 401 })
-  }
-
-  // DEV: skip DB check for dev session
-  if (process.env.NODE_ENV === 'development' && session.email === 'dev@fleetflow.local') {
-    return NextResponse.json({ valid: true, dev: true })
   }
 
   const supabase = createAdminClient()
