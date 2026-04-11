@@ -6,7 +6,8 @@ export async function updateSession(request: NextRequest) {
   const isPublicRoute =
     pathname.startsWith('/login') ||
     pathname.startsWith('/landing') ||
-    pathname.startsWith('/offline')
+    pathname.startsWith('/offline') ||
+    pathname.startsWith('/api/')
 
   if (isPublicRoute) {
     return NextResponse.next()

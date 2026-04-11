@@ -15,16 +15,35 @@ function getCookie(name: string): string | undefined {
   const match = document.cookie
     .split('; ')
     .find(row => row.startsWith(name + '='))
-  return match?.split('=')[1]
+  if (!match) return undefined
+  return match.slice(name.length + 1)
 }
 
 export function useCurrentUser(): CurrentUser | null {
   return useMemo(() => {
+    // fleetflow-user: cookie JS-acessível com perfil e nome
+    const userRaw = getCookie('fleetflow-user')
+    if (userRaw) {
+      try {
+        const parsed = JSON.parse(atob(userRaw))
+        const sessionRaw = getCookie('fleetflow-session')
+        let email = ''
+        if (sessionRaw) {
+          try { email = JSON.parse(atob(sessionRaw)).email ?? '' } catch { /* ignore */ }
+        }
+        return {
+          email,
+          perfil: parsed.perfil ?? 'motorista',
+          nome: parsed.nome ?? '',
+        }
+      } catch { /* ignore */ }
+    }
+
+    // fallback: fleetflow-session direto (caso não-httpOnly)
     const raw = getCookie('fleetflow-session')
     if (!raw) return null
     try {
-      const decoded = atob(raw)
-      const parsed = JSON.parse(decoded)
+      const parsed = JSON.parse(atob(raw))
       return {
         email: parsed.email ?? '',
         perfil: parsed.perfil ?? 'motorista',

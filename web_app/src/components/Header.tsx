@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Bell, Search, User, Menu } from "lucide-react";
 import UserProfilePanel from "./UserProfilePanel";
+import Link from "next/link";
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -10,6 +11,20 @@ interface HeaderProps {
 
 export default function Header({ onMenuClick }: HeaderProps) {
   const [profileOpen, setProfileOpen] = useState(false);
+  const [naoLidas, setNaoLidas] = useState(0);
+
+  useEffect(() => {
+    async function fetchCount() {
+      try {
+        const res = await fetch('/api/notificacoes?nao_lidas=true');
+        const json = await res.json();
+        setNaoLidas(json.count_nao_lidas ?? 0);
+      } catch { /* ignore */ }
+    }
+    fetchCount();
+    const interval = setInterval(fetchCount, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <>
@@ -36,10 +51,14 @@ export default function Header({ onMenuClick }: HeaderProps) {
         </div>
 
         <div className="flex items-center space-x-3 md:space-x-6">
-          <button className="relative text-gray-500 hover:text-brand-primary transition-colors">
+          <Link href="/notificacoes" className="relative text-gray-500 hover:text-brand-primary transition-colors">
             <Bell className="w-5 h-5 md:w-6 md:h-6" />
-            <span className="absolute top-0 right-0 w-2 h-2 md:w-2.5 md:h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
-          </button>
+            {naoLidas > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 border-2 border-white rounded-full flex items-center justify-center text-white text-[10px] font-bold px-0.5">
+                {naoLidas > 99 ? '99+' : naoLidas}
+              </span>
+            )}
+          </Link>
 
           <button
             onClick={() => setProfileOpen(true)}

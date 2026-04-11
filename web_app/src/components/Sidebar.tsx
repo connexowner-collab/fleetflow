@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Truck, ClipboardCheck, AlertTriangle, Settings, LogOut, Users, ArrowLeftRight, X } from 'lucide-react';
+import { LayoutDashboard, Truck, ClipboardCheck, AlertTriangle, Settings, LogOut, Users, ArrowLeftRight, X, Wrench, Fuel, MapPin, BarChart2, FileText, Bell } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 interface SidebarProps {
@@ -20,6 +20,12 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     { href: '/frota', label: 'Gestão da Frota', icon: Truck, roles: ['gestor', 'diretor', 'analista'] },
     { href: '/checklists', label: 'Checklists', icon: ClipboardCheck, roles: ['gestor', 'diretor', 'analista', 'motorista'] },
     { href: '/ocorrencias', label: 'Ocorrências', icon: AlertTriangle, roles: ['gestor', 'diretor', 'analista', 'motorista'] },
+    { href: '/manutencao', label: 'Manutenção', icon: Wrench, roles: ['gestor', 'diretor', 'analista'] },
+    { href: '/combustivel', label: 'Combustível', icon: Fuel, roles: ['gestor', 'diretor', 'analista'] },
+    { href: '/documentos', label: 'Documentos', icon: FileText, roles: ['gestor', 'diretor', 'analista'] },
+    { href: '/rastreamento', label: 'Rastreamento', icon: MapPin, roles: ['gestor', 'diretor', 'analista'] },
+    { href: '/relatorios', label: 'Relatórios & BI', icon: BarChart2, roles: ['gestor', 'diretor', 'analista'] },
+    { href: '/notificacoes', label: 'Notificações', icon: Bell, roles: ['gestor', 'diretor', 'analista'] },
     { href: '/admin/users', label: 'Gestão de Acessos', icon: Users, roles: ['gestor', 'diretor'] },
     { href: '/admin/trocas', label: 'Aprovações de Troca', icon: ArrowLeftRight, roles: ['gestor', 'diretor', 'analista'] },
     { href: '/configuracoes', label: 'Configurações', icon: Settings, roles: ['gestor', 'diretor'] },

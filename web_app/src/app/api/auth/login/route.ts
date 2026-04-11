@@ -47,20 +47,24 @@ export async function POST(request: Request) {
     JSON.stringify({ email: email.trim().toLowerCase(), perfil, nome, sv })
   ).toString('base64')
 
+  const userDisplay = Buffer.from(JSON.stringify({ perfil, nome })).toString('base64')
+  const cookieOpts = `Path=/; Max-Age=${60 * 60 * 24 * 7}; SameSite=Lax`
+  const securePart = process.env.NODE_ENV === 'production' ? '; Secure' : ''
+
   const response = NextResponse.json({ ok: true, perfil, nome })
-  response.cookies.set('fleetflow-session', sessionData, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 60 * 60 * 24 * 7, // 7 days
-  })
+
+  // fleetflow-session: httpOnly — protege o servidor e o proxy middleware
+  response.headers.append('Set-Cookie', `fleetflow-session=${sessionData}; HttpOnly${securePart}; ${cookieOpts}`)
+
+  // fleetflow-user: legível pelo JS — usado pelo useCurrentUser para exibir menus
+  response.headers.append('Set-Cookie', `fleetflow-user=${userDisplay}${securePart}; ${cookieOpts}`)
 
   return response
 }
 
 export async function DELETE() {
   const response = NextResponse.json({ ok: true })
-  response.cookies.delete('fleetflow-session')
+  response.headers.append('Set-Cookie', 'fleetflow-session=; HttpOnly; Path=/; Max-Age=0')
+  response.headers.append('Set-Cookie', 'fleetflow-user=; Path=/; Max-Age=0')
   return response
 }
