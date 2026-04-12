@@ -4,10 +4,10 @@ import {
   User, KeyRound, Bell, Shield, Palette, HelpCircle, LogOut, X,
   ChevronRight, Building2, Smartphone, ArrowLeft, Check, Eye,
   EyeOff, Save, AlertCircle, CheckCircle, Info, Sun, Moon,
-  Monitor, Type, Mail, Lock, RefreshCw, ExternalLink,
+  Monitor, Type, Mail, Lock, RefreshCw, ExternalLink, Camera, Upload,
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 interface UserProfilePanelProps {
   open: boolean;
@@ -75,11 +75,14 @@ function SubHeader({ title, onBack }: { title: string; onBack: () => void }) {
 // ─── Tela: Meu Perfil ────────────────────────────────────────
 function ViewPerfil({ onBack }: { onBack: () => void }) {
   const user = useCurrentUser();
-  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [profile, setProfile] = useState<ProfileData & { avatar_url?: string } | null>(null);
   const [nome, setNome] = useState('');
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch('/api/auth/profile')
@@ -87,10 +90,42 @@ function ViewPerfil({ onBack }: { onBack: () => void }) {
       .then(j => {
         setProfile(j.profile);
         setNome(j.profile?.nome ?? '');
+        setPreview(j.profile?.avatar_url ?? null);
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Preview imediato
+    const reader = new FileReader();
+    reader.onload = ev => setPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+
+    setUploading(true);
+    setMsg(null);
+
+    const fd = new FormData();
+    fd.append('avatar', file);
+
+    const res = await fetch('/api/auth/profile/avatar', { method: 'POST', body: fd });
+    const json = await res.json();
+    setUploading(false);
+
+    if (res.ok) {
+      setPreview(json.avatar_url);
+      setProfile(p => p ? { ...p, avatar_url: json.avatar_url } : p);
+      setMsg({ type: 'success', text: 'Foto atualizada com sucesso!' });
+    } else {
+      setMsg({ type: 'error', text: json.error ?? 'Erro ao enviar imagem.' });
+      setPreview(profile?.avatar_url ?? null);
+    }
+    // Limpa input para permitir reenvio do mesmo arquivo
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
 
   async function salvar() {
     setSalvando(true);
@@ -122,12 +157,55 @@ function ViewPerfil({ onBack }: { onBack: () => void }) {
     <>
       <SubHeader title="Meu Perfil" onBack={onBack} />
       <div className="flex-1 overflow-y-auto p-5 space-y-5">
-        {/* Avatar */}
+        {/* Avatar com upload */}
         <div className="flex flex-col items-center gap-3 py-4">
-          <div className="w-20 h-20 rounded-full bg-brand-primary/20 flex items-center justify-center text-brand-primary font-bold text-2xl">
-            {iniciais}
+          <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+            {/* Foto ou iniciais */}
+            {preview ? (
+              <img
+                src={preview}
+                alt="Avatar"
+                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
+              />
+            ) : (
+              <div className="w-24 h-24 rounded-full bg-brand-primary/20 flex items-center justify-center text-brand-primary font-bold text-2xl border-4 border-white shadow-lg">
+                {iniciais}
+              </div>
+            )}
+
+            {/* Overlay de hover */}
+            <div className={`absolute inset-0 rounded-full flex items-center justify-center transition-all ${uploading ? 'bg-black/40' : 'bg-black/0 group-hover:bg-black/40'}`}>
+              {uploading ? (
+                <RefreshCw className="w-6 h-6 text-white animate-spin" />
+              ) : (
+                <Camera className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+              )}
+            </div>
+
+            {/* Badge câmera */}
+            <div className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-brand-primary border-2 border-white flex items-center justify-center shadow">
+              <Upload className="w-3.5 h-3.5 text-white" />
+            </div>
           </div>
-          <span className="text-xs text-gray-400">Foto de perfil em breve</span>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="hidden"
+            onChange={handleAvatarChange}
+          />
+
+          <div className="text-center">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="text-sm text-brand-primary font-medium hover:underline disabled:opacity-50"
+            >
+              {uploading ? 'Enviando...' : 'Alterar foto'}
+            </button>
+            <p className="text-xs text-gray-400 mt-0.5">JPG, PNG ou WebP · Máx. 2 MB</p>
+          </div>
         </div>
 
         {/* Campos */}
@@ -675,6 +753,17 @@ const menuItems = [
 export default function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
   const user = useCurrentUser();
   const [view, setView] = useState<View>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // Carrega avatar ao abrir o painel
+  useEffect(() => {
+    if (open) {
+      fetch('/api/auth/profile')
+        .then(r => r.json())
+        .then(j => setAvatarUrl(j.profile?.avatar_url ?? null))
+        .catch(() => {});
+    }
+  }, [open]);
 
   const nomeCurto   = user?.nome || user?.email || 'Usuário';
   const iniciais    = nomeCurto.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
@@ -725,8 +814,11 @@ export default function UserProfilePanel({ open, onClose }: UserProfilePanelProp
         {/* User Info */}
         <div className="px-5 py-5 bg-gray-50 border-b border-gray-100">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-full bg-brand-primary/20 flex items-center justify-center text-brand-primary font-bold text-lg">
-              {iniciais || <User className="w-5 h-5" />}
+            <div className="w-12 h-12 rounded-full overflow-hidden bg-brand-primary/20 flex items-center justify-center text-brand-primary font-bold text-lg flex-shrink-0">
+              {avatarUrl
+                ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                : (iniciais || <User className="w-5 h-5" />)
+              }
             </div>
             <div>
               <p className="text-sm font-semibold text-gray-800">{nomeCurto}</p>
