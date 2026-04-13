@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Settings, Building, Bell, Shield, Save, CheckCircle, ClipboardList, Plus, Trash2, MapPin, Briefcase, Grid3X3, Wrench } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { applyBrandColor } from '@/utils/brand';
 
 type Opcao = { id: string; valor: string; ativo: boolean };
 type Categoria = 'unidade' | 'setor' | 'area' | 'item_inspecao';
@@ -71,6 +72,7 @@ export default function ConfiguracoesPage() {
       .update({ nome: empresa, cnpj, email: emailContato, cor_primaria: corPrimaria })
       .eq('id', (await supabase.from('tenants').select('id').single()).data?.id);
 
+    if (!error) applyBrandColor(corPrimaria)
     showToast(error ? `⚠️ Erro: ${error.message}` : '✅ Dados da empresa salvos!');
   };
 
@@ -224,11 +226,29 @@ export default function ConfiguracoesPage() {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Cor Primária da Marca</label>
                 <div className="flex items-center gap-3">
-                  <input type="color" value={corPrimaria} onChange={e => setCorPrimaria(e.target.value)}
-                    className="w-12 h-12 rounded-lg border border-gray-300 cursor-pointer p-1" />
-                  <input type="text" value={corPrimaria} onChange={e => setCorPrimaria(e.target.value)}
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary text-sm font-mono" />
+                  <input
+                    type="color"
+                    value={corPrimaria}
+                    onChange={e => { setCorPrimaria(e.target.value); applyBrandColor(e.target.value); }}
+                    className="w-12 h-12 rounded-lg border border-gray-300 cursor-pointer p-1"
+                  />
+                  <input
+                    type="text"
+                    value={corPrimaria}
+                    onChange={e => {
+                      setCorPrimaria(e.target.value)
+                      if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) applyBrandColor(e.target.value)
+                    }}
+                    placeholder="#0056B3"
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary text-sm font-mono"
+                  />
+                  <div
+                    className="w-10 h-10 rounded-lg border border-gray-200 flex-shrink-0 shadow-inner"
+                    style={{ backgroundColor: corPrimaria }}
+                    title="Preview da cor"
+                  />
                 </div>
+                <p className="text-xs text-gray-400 mt-1">A cor é aplicada em tempo real na interface.</p>
               </div>
             </div>
             <div className="mt-6 flex justify-end">

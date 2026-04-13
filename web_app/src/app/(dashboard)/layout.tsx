@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
+import { applyBrandColor } from '@/utils/brand';
 
 export default function DashboardLayout({
   children,
@@ -14,7 +15,6 @@ export default function DashboardLayout({
   const router = useRouter();
 
   // G4.3: Verify session validity on every dashboard mount.
-  // Handles immediate invalidation when user is deactivated/deleted.
   useEffect(() => {
     fetch('/api/auth/check')
       .then(r => r.json())
@@ -25,8 +25,19 @@ export default function DashboardLayout({
           })
         }
       })
-      .catch(() => {}) // network errors don't log out the user
+      .catch(() => {})
   }, [router])
+
+  // Aplica cor da marca do tenant ao carregar
+  useEffect(() => {
+    fetch('/api/auth/profile')
+      .then(r => r.json())
+      .then(data => {
+        const cor = data?.tenant?.cor_primaria
+        if (cor) applyBrandColor(cor)
+      })
+      .catch(() => {})
+  }, [])
 
   return (
     <div className="flex bg-background text-foreground h-full w-full overflow-hidden">
