@@ -60,7 +60,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         <div className="p-6 flex items-center justify-between border-b border-sidebar-fg/10 bg-sidebar-bg/50 backdrop-blur-xl">
           <button
             onClick={goHome}
-            className="flex items-center space-x-3 hover:opacity-80 transition-opacity"
+            className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer select-none"
             title="Ir para o Dashboard"
           >
             <div className="w-12 h-12 flex items-center justify-center overflow-hidden">
