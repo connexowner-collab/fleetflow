@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { LayoutDashboard, Truck, ClipboardCheck, AlertTriangle, Settings, LogOut, Users, ArrowLeftRight, X, Wrench, Fuel, MapPin, BarChart2, FileText, Bell } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
@@ -15,6 +16,8 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const router = useRouter();
   const user = useCurrentUser();
   const perfil = user?.perfil ?? 'motorista';
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   function goHome() {
     onClose();
@@ -76,7 +79,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
+          {!mounted ? null : navItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
 
