@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, Truck, ClipboardCheck, AlertTriangle, Settings, LogOut, Users, ArrowLeftRight, X, Wrench, Fuel, MapPin, BarChart2, FileText, Bell } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
@@ -12,8 +12,15 @@ interface SidebarProps {
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const user = useCurrentUser();
   const perfil = user?.perfil ?? 'motorista';
+
+  function goHome() {
+    onClose();
+    router.push('/');
+    router.refresh();
+  }
 
   const allNavItems = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['gestor', 'diretor', 'analista', 'motorista'] },
@@ -51,12 +58,16 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         md:translate-x-0
       `}>
         <div className="p-6 flex items-center justify-between border-b border-sidebar-fg/10 bg-sidebar-bg/50 backdrop-blur-xl">
-          <div className="flex items-center space-x-3">
+          <button
+            onClick={goHome}
+            className="flex items-center space-x-3 hover:opacity-80 transition-opacity"
+            title="Ir para o Dashboard"
+          >
             <div className="w-12 h-12 flex items-center justify-center overflow-hidden">
               <img src="/logo_v3.png" alt="FleetFlow" className="w-full h-full object-contain" />
             </div>
             <span className="text-xl font-black tracking-tighter uppercase italic">Fleet<span className="text-brand-secondary">Flow</span></span>
-          </div>
+          </button>
           <button
             onClick={onClose}
             className="md:hidden p-1.5 rounded-lg hover:bg-sidebar-fg/10 text-sidebar-fg/60"
