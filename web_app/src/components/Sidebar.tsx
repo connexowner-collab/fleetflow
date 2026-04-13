@@ -19,7 +19,6 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   function goHome() {
     onClose();
     router.push('/');
-    router.refresh();
   }
 
   const allNavItems = [
