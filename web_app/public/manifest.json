@@ -1,28 +1,62 @@
 {
-  "name": "FleetFlow - Gestão de Frotas",
+  "name": "FleetFlow",
   "short_name": "FleetFlow",
-  "description": "Sistema Inteligente de Gestão de Frotas e Ocorrências",
-  "start_url": "/",
+  "description": "Gestão de Frotas — App do Motorista",
+  "start_url": "/app",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#002D5B",
+  "background_color": "#0f172a",
   "theme_color": "#0056B3",
   "orientation": "portrait-primary",
-  "scope": "/",
   "lang": "pt-BR",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
-  "screenshots": [],
-  "categories": ["business", "productivity"]
+  "screenshots": [
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "FleetFlow — Tela Inicial"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Checklist Diário",
+      "short_name": "Checklist",
+      "url": "/app/checklist",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Solicitar Manutenção",
+      "short_name": "Manutenção",
+      "url": "/app/manutencao",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ]
 }
