@@ -5,6 +5,7 @@ export async function updateSession(request: NextRequest) {
 
   const isPublicRoute =
     pathname.startsWith('/login') ||
+    pathname.startsWith('/app/login') ||
     pathname.startsWith('/landing') ||
     pathname.startsWith('/offline') ||
     pathname.startsWith('/api/')
@@ -17,7 +18,8 @@ export async function updateSession(request: NextRequest) {
 
   if (!session?.value) {
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    // APP routes → redirect to /app/login
+    url.pathname = pathname.startsWith('/app') ? '/app/login' : '/login'
     return NextResponse.redirect(url)
   }
 
