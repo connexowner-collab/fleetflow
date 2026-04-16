@@ -3,9 +3,9 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { logAudit, getClientIp, AuditAcao } from '@/utils/audit'
 import { cookies } from 'next/headers'
 
-function getSession() {
+async function getSession() {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const raw = cookieStore.get('fleetflow-session')?.value
     if (!raw) return null
     return JSON.parse(Buffer.from(raw, 'base64').toString('utf8')) as {
@@ -75,7 +75,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = getSession()
+  const session = await getSession()
   const body = await request.json()
   const {
     veiculo_id, veiculo_placa, veiculo_modelo,
@@ -136,7 +136,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const session = getSession()
+  const session = await getSession()
   const body = await request.json()
   const { id, acao, observacao, ...campos } = body
 
