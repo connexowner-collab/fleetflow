@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Truck, User, ArrowRight, Eye, CheckCircle2, XCircle, Clock, AlertCircle, FileText, Camera, ShieldCheck, Calendar, X } from 'lucide-react';
+import { Truck, ArrowRight, Eye, CheckCircle2, AlertCircle, Camera, ShieldCheck, X } from 'lucide-react';
 
 type Exchange = {
   id: string;

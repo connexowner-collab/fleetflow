@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getSessionFromRequest } from '@/utils/session'
 
 // GET /api/admin/frota/documentos?veiculo_id=xxx
 export async function GET(request: Request) {
+  const session = await getSessionFromRequest(request)
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   const { searchParams } = new URL(request.url)
   const veiculo_id = searchParams.get('veiculo_id')
   if (!veiculo_id) return NextResponse.json({ error: 'veiculo_id obrigatório' }, { status: 400 })
@@ -20,6 +24,9 @@ export async function GET(request: Request) {
 
 // PATCH /api/admin/frota/documentos
 export async function PATCH(request: Request) {
+  const session = await getSessionFromRequest(request)
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   const supabase = createAdminClient()
   const body = await request.json()
   const { id, numero, data_vencimento, observacao } = body

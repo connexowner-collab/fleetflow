@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getSessionFromRequest } from '@/utils/session'
 
-export async function GET() {
+export async function GET(request: Request) {
+  const session = await getSessionFromRequest(request)
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   const supabase = createAdminClient()
 
   try {

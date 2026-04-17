@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getSessionFromRequest } from '@/utils/session'
 
 const supabase = () => createAdminClient()
 
-export async function GET() {
+export async function GET(request: Request) {
+  const session = await getSessionFromRequest(request)
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   const db = supabase()
   const { data, error } = await db
     .from('rastreamento')
@@ -15,6 +19,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const session = await getSessionFromRequest(request)
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   const body = await request.json()
   const { veiculo_id, veiculo_placa, lat, lng, velocidade, ignicao, odometro, status } = body
 

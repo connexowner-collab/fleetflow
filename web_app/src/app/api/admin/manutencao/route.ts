@@ -9,7 +9,7 @@ async function getSession() {
     const raw = cookieStore.get('fleetflow-session')?.value
     if (!raw) return null
     return JSON.parse(Buffer.from(raw, 'base64').toString('utf8')) as {
-      id: string; email: string; perfil: string; nome: string; tenant_id?: string
+      email: string; perfil: string; nome: string; sv?: number
     }
   } catch { return null }
 }
@@ -37,6 +37,9 @@ function calcSLA(urgencia: string): Date {
 }
 
 export async function GET(request: Request) {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   const { searchParams } = new URL(request.url)
   const veiculo_id = searchParams.get('veiculo_id')
   const status     = searchParams.get('status')
@@ -137,6 +140,8 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   const session = await getSession()
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   const body = await request.json()
   const { id, acao, observacao, ...campos } = body
 
@@ -181,10 +186,6 @@ export async function PATCH(request: Request) {
     for (const k of editaveis) {
       if (campos[k] !== undefined) updates[k] = campos[k]
     }
-    if (campos.status !== undefined) {
-      updates.status = campos.status
-      novo_status = campos.status
-    }
   }
 
   const { error } = await client.from('manutencoes').update(updates).eq('id', id)
@@ -217,6 +218,9 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 })

@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getSessionFromRequest } from '@/utils/session'
 
 const supabase = () => createAdminClient()
 
 export async function GET(request: Request) {
+  const session = await getSessionFromRequest(request)
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   const { searchParams } = new URL(request.url)
   const nao_lidas = searchParams.get('nao_lidas')
 
@@ -24,6 +28,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const session = await getSessionFromRequest(request)
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   const body = await request.json()
   const { tipo, prioridade, titulo, mensagem, destinatario, referencia_id, referencia_tipo } = body
 
@@ -50,6 +57,9 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const session = await getSessionFromRequest(request)
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   const body = await request.json()
   const { id, lida, marcar_todas } = body
 
@@ -76,6 +86,9 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const session = await getSessionFromRequest(request)
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 })

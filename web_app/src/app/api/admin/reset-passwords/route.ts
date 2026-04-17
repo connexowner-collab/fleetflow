@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getSessionFromRequest } from '@/utils/session'
 
 const SENHA_PADRAO = 'FleetFlow@2026'
 
-export async function POST() {
+export async function POST(request: Request) {
+  const session = await getSessionFromRequest(request)
+  if (!session || session.perfil !== 'diretor') {
+    return NextResponse.json({ error: 'Acesso restrito.' }, { status: 403 })
+  }
+
   const supabase = createAdminClient()
 
   try {

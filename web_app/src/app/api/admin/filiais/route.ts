@@ -5,7 +5,10 @@ import { logAudit, getClientIp } from '@/utils/audit'
 
 const db = () => createAdminClient()
 
-export async function GET() {
+export async function GET(request: Request) {
+  const session = await getSessionFromRequest(request)
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   const { data, error } = await db()
     .from('filiais')
     .select('*')

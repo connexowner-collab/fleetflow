@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getSessionFromRequest } from '@/utils/session'
 
 // GET /api/admin/veiculos - lista para dropdown de Gestão de Acessos
 // Exclui: deletados, inativos, Em Manutenção (R2, R8)
-export async function GET() {
+export async function GET(request: Request) {
+  const session = await getSessionFromRequest(request)
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   const supabase = createAdminClient()
   try {
     const { data, error } = await supabase
@@ -21,6 +25,9 @@ export async function GET() {
 
 // PATCH /api/admin/veiculos - altera status do veículo
 export async function PATCH(request: Request) {
+  const session = await getSessionFromRequest(request)
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   const supabase = createAdminClient()
   const { id, status } = await request.json()
 

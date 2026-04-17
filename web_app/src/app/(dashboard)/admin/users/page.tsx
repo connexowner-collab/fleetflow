@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Plus, Search, ShieldCheck, Mail, Building, Smartphone, Monitor,
+  Plus, ShieldCheck, Mail, Building, Smartphone, Monitor,
   X, Check, Globe, LayoutDashboard, Pencil, Trash2, Power, Truck,
   KeyRound, History, Filter, Eye,
 } from 'lucide-react';
@@ -90,6 +90,51 @@ const ACOES_COLOR: Record<string, string> = {
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
+
+function veiculoLabel(v: Veiculo) {
+  return `${v.modelo} (${v.placa})`;
+}
+
+function toggleTela(tela: string, list: string[], setList: (v: string[]) => void) {
+  setList(list.includes(tela) ? list.filter(t => t !== tela) : [...list, tela]);
+}
+
+// ── Sub-componentes (module scope) ───────────────────────────────────────────
+
+const VeiculoSelect = ({ value, onChange, veiculos }: { value: string; onChange: (v: string) => void; veiculos: Veiculo[] }) => (
+  <div>
+    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+      <Truck className="w-3.5 h-3.5" /> Veículo Vinculado <span className="text-gray-300">(opcional)</span>
+    </label>
+    <select value={value} onChange={e => onChange(e.target.value)}
+      className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary/30 bg-white font-bold text-gray-900">
+      <option value="">— Nenhum veículo vinculado —</option>
+      {veiculos.map(v => (
+        <option key={v.id} value={v.id}>
+          {veiculoLabel(v)} {v.status !== 'Disponível' ? `· ${v.status}` : ''}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+
+const TelasList = ({ list, setList }: { list: string[]; setList: (v: string[]) => void }) => (
+  <div>
+    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Telas Visíveis no App</label>
+    <div className="space-y-2">
+      {TELAS.map(t => (
+        <label key={t.id} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${list.includes(t.id) ? 'border-brand-primary bg-brand-primary/5' : 'border-gray-200 hover:bg-gray-50'}`}>
+          <input type="checkbox" checked={list.includes(t.id)} onChange={() => toggleTela(t.id, list, setList)} className="w-4 h-4 text-brand-primary rounded" />
+          <span className="text-lg">{t.icon}</span>
+          <div>
+            <span className="font-black text-gray-900 text-sm">{t.label}</span>
+            <span className="block text-xs text-gray-400">{t.desc}</span>
+          </div>
+        </label>
+      ))}
+    </div>
+  </div>
+);
 
 // ── Componente Principal ─────────────────────────────────────────────────────
 
@@ -185,14 +230,9 @@ export default function UsersManagement() {
   }, [auditPage, afDataInicio, afDataFim, afAtor, afAcao, afUsuario]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     if (activeTab === 'historico') loadAuditLogs();
   }, [activeTab, loadAuditLogs]);
-
-  // ── Helpers ──
-  const toggleTela = (tela: string, list: string[], setList: (v: string[]) => void) => {
-    setList(list.includes(tela) ? list.filter(t => t !== tela) : [...list, tela]);
-  };
-  const veiculoLabel = (v: Veiculo) => `${v.modelo} (${v.placa})`;
 
   // ── Filtro client-side (G2.1) ──
   const filtered = users.filter(u => {
@@ -300,42 +340,6 @@ export default function UsersManagement() {
     showToast(data.error ? `⚠️ ${data.error}` : `✅ Nova senha enviada para ${modalReset.email}`, data.error ? 'error' : 'success');
     setLoading(false);
   };
-
-  // ── Sub-componentes reutilizáveis ──
-  const VeiculoSelect = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-    <div>
-      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-        <Truck className="w-3.5 h-3.5" /> Veículo Vinculado <span className="text-gray-300">(opcional)</span>
-      </label>
-      <select value={value} onChange={e => onChange(e.target.value)}
-        className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary/30 bg-white font-bold text-gray-900">
-        <option value="">— Nenhum veículo vinculado —</option>
-        {veiculos.map(v => (
-          <option key={v.id} value={v.id}>
-            {veiculoLabel(v)} {v.status !== 'Disponível' ? `· ${v.status}` : ''}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-
-  const TelasList = ({ list, setList }: { list: string[]; setList: (v: string[]) => void }) => (
-    <div>
-      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Telas Visíveis no App</label>
-      <div className="space-y-2">
-        {TELAS.map(t => (
-          <label key={t.id} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${list.includes(t.id) ? 'border-brand-primary bg-brand-primary/5' : 'border-gray-200 hover:bg-gray-50'}`}>
-            <input type="checkbox" checked={list.includes(t.id)} onChange={() => toggleTela(t.id, list, setList)} className="w-4 h-4 text-brand-primary rounded" />
-            <span className="text-lg">{t.icon}</span>
-            <div>
-              <span className="font-black text-gray-900 text-sm">{t.label}</span>
-              <span className="block text-xs text-gray-400">{t.desc}</span>
-            </div>
-          </label>
-        ))}
-      </div>
-    </div>
-  );
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -697,7 +701,7 @@ export default function UsersManagement() {
                       </select>
                     </div>
                   </div>
-                  <VeiculoSelect value={newVeiculoId} onChange={setNewVeiculoId} />
+                  <VeiculoSelect value={newVeiculoId} onChange={setNewVeiculoId} veiculos={veiculos} />
                   {(newAcesso === 'app' || newAcesso === 'ambos') && (
                     <TelasList list={newTelas} setList={setNewTelas} />
                   )}
@@ -757,7 +761,7 @@ export default function UsersManagement() {
                       </select>
                     </div>
                   </div>
-                  <VeiculoSelect value={editVeiculoId} onChange={setEditVeiculoId} />
+                  <VeiculoSelect value={editVeiculoId} onChange={setEditVeiculoId} veiculos={veiculos} />
                   <TelasList list={editTelas} setList={setEditTelas} />
                 </div>
                 <div className="border-t px-8 py-5 flex gap-3 shrink-0">
