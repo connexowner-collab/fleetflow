@@ -43,11 +43,12 @@ export default function AppHome() {
       try {
         const res  = await fetch('/api/auth/profile')
         const json = await res.json()
-        setUser({ nome: json.nome, email: json.email, perfil: json.perfil })
+        const profile = json.profile ?? json
+        setUser({ nome: profile.nome, email: profile.email, perfil: profile.perfil })
 
         // Carregar veículo vinculado
-        if (json.veiculo_id) {
-          const vRes  = await fetch(`/api/admin/veiculos?id=${json.veiculo_id}`)
+        if (profile.veiculo_id) {
+          const vRes  = await fetch(`/api/admin/veiculos?id=${profile.veiculo_id}`)
           const vJson = await vRes.json()
           if (vJson.veiculo) setVeiculo(vJson.veiculo)
         }
