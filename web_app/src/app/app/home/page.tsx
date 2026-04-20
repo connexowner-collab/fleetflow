@@ -1,48 +1,22 @@
 "use client"
 
 import { useEffect, useState, useCallback } from 'react'
-import { Truck, Wifi, WifiOff, LogOut, RefreshCw, ClipboardCheck } from 'lucide-react'
+import { Bell, RefreshCw, LogOut, PlayCircle, History, Car, CheckCircle2, ClipboardCheck } from 'lucide-react'
 import Link from 'next/link'
 import BottomNav from '../components/BottomNav'
 
-interface VeiculoCard {
-  placa: string
-  modelo: string
-  marca: string
-  status: string
-  tipo: string
-  km_atual: number
+interface Veiculo {
+  placa: string; modelo: string; marca: string; status: string
+  tipo: string; km_atual: number; cor: string; ano_fabricacao: number
 }
-
-interface UserData {
-  nome: string
-  email: string
-  perfil: string
-}
-
-interface SolicitacaoPendente {
-  placa: string
-  solicitante: string
-  data: string
-}
-
-const STATUS_COLOR: Record<string, string> = {
-  Ativo:           'bg-green-500',
-  'Em Manutenção': 'bg-yellow-500',
-  Inativo:         'bg-gray-500',
-  'Em Rota':       'bg-blue-500',
-  Disponível:      'bg-green-500',
-}
+interface UserData { nome: string; email: string; perfil: string }
 
 export default function AppHome() {
-  const [user, setUser]               = useState<UserData | null>(null)
-  const [veiculo, setVeiculo]         = useState<VeiculoCard | null>(null)
-  const [loading, setLoading]         = useState(true)
-  const [refreshing, setRefreshing]   = useState(false)
-  const [online, setOnline]           = useState(true)
-  const [notifs, setNotifs]           = useState(0)
-  const [solicitacao, setSolicitacao] = useState<SolicitacaoPendente | null>(null)
-  const [showSolicitacao, setShowSolicitacao] = useState(false)
+  const [user,       setUser]       = useState<UserData | null>(null)
+  const [veiculo,    setVeiculo]    = useState<Veiculo | null>(null)
+  const [loading,    setLoading]    = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [notifs,     setNotifs]     = useState(0)
 
   const load = useCallback(async (manual = false) => {
     if (manual) setRefreshing(true)
@@ -52,33 +26,20 @@ export default function AppHome() {
         fetch('/api/notificacoes?nao_lidas=true'),
       ])
       const profJson = await profRes.json()
-      const profile = profJson.profile ?? profJson
+      const profile  = profJson.profile ?? profJson
+      if (profile.nome) setUser({ nome: profile.nome, email: profile.email, perfil: profile.perfil })
 
-      if (profile.nome) {
-        setUser({ nome: profile.nome, email: profile.email, perfil: profile.perfil })
-      }
-
-      // Veículo via API do APP
       if (profile.placa_vinculada || profile.veiculo_id) {
-        const vRes = await fetch('/api/app/veiculo')
+        const vRes  = await fetch('/api/app/veiculo')
         const vJson = await vRes.json()
-        if (vJson.veiculo) setVeiculo(vJson.veiculo)
-        else setVeiculo(null)
+        setVeiculo(vJson.veiculo ?? null)
       } else {
         setVeiculo(null)
       }
 
       const notifJson = await notifRes.json()
       setNotifs(notifJson.count_nao_lidas ?? 0)
-
-      // Verificar solicitação de checklist pendente
-      if (profile.solicitacao_checklist_pendente) {
-        setSolicitacao(profile.solicitacao_checklist_pendente)
-        setShowSolicitacao(true)
-      }
-    } catch {
-      // offline — mantém cache
-    } finally {
+    } catch { /* offline */ } finally {
       setLoading(false)
       setRefreshing(false)
     }
@@ -86,19 +47,8 @@ export default function AppHome() {
 
   useEffect(() => {
     load()
-    setOnline(navigator.onLine)
-    const goOnline  = () => setOnline(true)
-    const goOffline = () => setOnline(false)
-    window.addEventListener('online',  goOnline)
-    window.addEventListener('offline', goOffline)
-
-    // Polling a cada 5 minutos conforme spec D-04 v2
     const interval = setInterval(() => load(), 5 * 60 * 1000)
-    return () => {
-      window.removeEventListener('online',  goOnline)
-      window.removeEventListener('offline', goOffline)
-      clearInterval(interval)
-    }
+    return () => clearInterval(interval)
   }, [load])
 
   async function logout() {
@@ -107,151 +57,177 @@ export default function AppHome() {
     window.location.href = '/app/login'
   }
 
-  const menuItems = [
-    { href: '/app/checklist',   icon: '✅', label: 'Checklist',       desc: 'Inspeção diária',          color: 'bg-blue-600' },
-    { href: '/app/dados-ativo', icon: '🚛', label: 'Dados do Ativo',  desc: 'Documentos e dados',       color: 'bg-purple-600' },
-    { href: '/app/manutencao',  icon: '🔧', label: 'Manutenção',      desc: 'Solicitar ou acompanhar',  color: 'bg-orange-600' },
-    { href: '/app/notificacoes',icon: '🔔', label: 'Notificações',    desc: 'Alertas e avisos',         color: 'bg-slate-600' },
-  ]
+  const nome = user?.nome?.split(' ')[0] ?? 'Motorista'
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-900">
-
-      {/* Modal bloqueante de solicitação de checklist */}
-      {showSolicitacao && solicitacao && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-5">
-          <div className="bg-slate-800 rounded-2xl p-6 border border-yellow-500/50 w-full max-w-sm">
-            <div className="text-center mb-4">
-              <div className="bg-yellow-500/20 rounded-full w-14 h-14 flex items-center justify-center mx-auto mb-3">
-                <ClipboardCheck className="w-7 h-7 text-yellow-400" />
-              </div>
-              <h2 className="text-white font-bold text-lg">Checklist Solicitado</h2>
-              <p className="text-slate-400 text-sm mt-1">Um checklist foi solicitado para o veículo</p>
-            </div>
-            <div className="bg-slate-700 rounded-xl p-4 space-y-2 mb-5">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Veículo</span>
-                <span className="text-white font-bold">{solicitacao.placa}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Solicitante</span>
-                <span className="text-white">{solicitacao.solicitante}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Data</span>
-                <span className="text-white">{new Date(solicitacao.data).toLocaleDateString('pt-BR')}</span>
-              </div>
-            </div>
-            <Link
-              href="/app/checklist"
-              onClick={() => setShowSolicitacao(false)}
-              className="block w-full bg-blue-600 text-white text-center font-semibold rounded-xl py-3 mb-2"
-            >
-              Realizar Checklist Agora
-            </Link>
-            <button
-              onClick={() => setShowSolicitacao(false)}
-              className="w-full text-slate-400 text-sm py-2"
-            >
-              Fazer depois
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Banner offline */}
-      {!online && (
-        <div className="bg-yellow-500 text-yellow-900 text-xs text-center py-1.5 px-4 flex items-center justify-center gap-1.5">
-          <WifiOff className="w-3.5 h-3.5" />
-          Sem conexão — exibindo dados do último acesso
-        </div>
-      )}
+    <div className="flex flex-col min-h-screen bg-[#F4F6FB] pb-20">
 
       {/* Header */}
-      <header className="flex items-center justify-between px-5 pt-12 pb-4">
-        <div>
-          <p className="text-slate-400 text-xs uppercase tracking-widest">FleetFlow</p>
-          {loading ? (
-            <div className="h-6 w-32 bg-slate-700 rounded animate-pulse mt-1" />
-          ) : (
-            <h1 className="text-white font-bold text-lg mt-0.5">
-              Olá, {user?.nome?.split(' ')[0] ?? 'Motorista'} 👋
-            </h1>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          {online ? <Wifi className="w-4 h-4 text-green-400" /> : <WifiOff className="w-4 h-4 text-yellow-400" />}
-          <button onClick={() => load(true)} className="p-1.5" title="Atualizar">
-            <RefreshCw className={`w-4 h-4 text-slate-400 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
-          <button onClick={logout} className="p-2">
-            <LogOut className="w-5 h-5 text-slate-400" />
-          </button>
-        </div>
-      </header>
-
-      {/* Card do Veículo */}
-      <div className="mx-5 mb-6">
-        {loading ? (
-          <div className="bg-slate-800 rounded-2xl p-5 animate-pulse">
-            <div className="h-4 w-24 bg-slate-700 rounded mb-3" />
-            <div className="h-8 w-36 bg-slate-700 rounded mb-2" />
-            <div className="h-4 w-48 bg-slate-700 rounded" />
+      <div className="bg-white px-5 pt-12 pb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+               style={{ background: 'linear-gradient(135deg,#4B3FE4,#7C3AED)' }}>
+            <Car className="w-4 h-4 text-white" />
           </div>
-        ) : veiculo ? (
-          <div className="bg-gradient-to-br from-blue-900 to-slate-800 rounded-2xl p-5 border border-blue-800/50 shadow-xl">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="bg-blue-600/30 p-2 rounded-xl">
-                  <Truck className="w-5 h-5 text-blue-300" />
-                </div>
-                <span className="text-blue-300 text-xs font-semibold uppercase tracking-wide">Meu Veículo</span>
-              </div>
-              <span className={`text-xs font-bold text-white px-2.5 py-1 rounded-full ${STATUS_COLOR[veiculo.status] ?? 'bg-slate-600'}`}>
-                {veiculo.status}
+          <span className="font-bold text-gray-900 text-base">FleetFlow</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => load(true)} className="p-2">
+            <RefreshCw className={`w-4 h-4 text-gray-400 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+          <Link href="/app/notificacoes" className="relative p-2">
+            <Bell className="w-5 h-5 text-gray-600" />
+            {notifs > 0 && (
+              <span className="absolute top-1 right-1 bg-red-500 text-white text-[8px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {notifs > 9 ? '9+' : notifs}
               </span>
+            )}
+          </Link>
+          <button onClick={logout} className="p-1">
+            <LogOut className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
+      </div>
+
+      <div className="px-5 pt-5 space-y-4">
+
+        {/* Saudação */}
+        {loading ? (
+          <div className="h-10 bg-gray-200 rounded-xl animate-pulse" />
+        ) : (
+          <div>
+            <p className="text-gray-500 text-sm">Bem-vindo de volta,</p>
+            <h1 className="text-2xl font-bold text-gray-900">Olá, {nome}</h1>
+          </div>
+        )}
+
+        {/* Card do Veículo */}
+        {loading ? (
+          <div className="bg-white rounded-3xl h-56 animate-pulse" />
+        ) : veiculo ? (
+          <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100">
+            {/* Imagem / Banner */}
+            <div className="relative h-36 w-full overflow-hidden"
+                 style={{ background: 'linear-gradient(135deg, #4B3FE4 0%, #7C3AED 60%, #A78BFA 100%)' }}>
+              <div className="absolute inset-0 flex items-center justify-center opacity-20">
+                <Car className="w-28 h-28 text-white" />
+              </div>
+              <div className="absolute bottom-3 left-4 flex gap-2">
+                <span className="bg-green-400 text-green-900 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> {veiculo.status}
+                </span>
+                <span className="bg-white/20 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                  DOCUMENTAÇÃO OK
+                </span>
+              </div>
+              <div className="absolute top-3 right-3">
+                <button onClick={() => load(true)} className="bg-white/20 p-1.5 rounded-lg">
+                  <RefreshCw className="w-3.5 h-3.5 text-white" />
+                </button>
+              </div>
+              <div className="absolute bottom-10 left-4">
+                <p className="text-white font-bold text-lg">{veiculo.marca} {veiculo.modelo}</p>
+                <p className="text-white/80 text-sm font-semibold tracking-widest">{veiculo.placa}</p>
+              </div>
+              {/* Pills */}
+              <div className="absolute bottom-3 right-4 flex gap-1.5">
+                {veiculo.cor && (
+                  <span className="bg-black/30 text-white/90 text-[10px] font-medium px-2 py-0.5 rounded-full">{veiculo.cor}</span>
+                )}
+                {veiculo.ano_fabricacao && (
+                  <span className="bg-black/30 text-white/90 text-[10px] font-medium px-2 py-0.5 rounded-full">{veiculo.ano_fabricacao}</span>
+                )}
+                {veiculo.tipo && (
+                  <span className="bg-black/30 text-white/90 text-[10px] font-medium px-2 py-0.5 rounded-full">{veiculo.tipo}</span>
+                )}
+              </div>
             </div>
-            <p className="text-white text-3xl font-bold tracking-widest mb-1">{veiculo.placa}</p>
-            <p className="text-slate-300 text-sm">{veiculo.marca} {veiculo.modelo}</p>
-            <div className="flex items-center justify-between mt-3">
-              <p className="text-slate-500 text-xs">{veiculo.tipo}</p>
-              {veiculo.km_atual > 0 && (
-                <p className="text-slate-400 text-xs">{veiculo.km_atual.toLocaleString('pt-BR')} km</p>
-              )}
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 divide-x divide-gray-100 border-t border-gray-100">
+              <div className="p-4">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Próxima Revisão</p>
+                <p className="text-lg font-bold text-gray-900 mt-0.5">{veiculo.km_atual.toLocaleString('pt-BR')} km</p>
+              </div>
+              <div className="p-4">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Combustível</p>
+                <p className="text-lg font-bold text-gray-900 mt-0.5">—</p>
+              </div>
             </div>
           </div>
         ) : (
-          <div className="bg-slate-800 rounded-2xl p-5 border border-slate-700 text-center">
-            <Truck className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-            <p className="text-slate-400 text-sm font-medium">Nenhum veículo vinculado</p>
-            <p className="text-slate-500 text-xs mt-1">Consulte seu gestor para vincular um veículo</p>
+          <div className="bg-white rounded-3xl p-8 text-center shadow-sm border border-gray-100">
+            <Car className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 font-medium">Nenhum veículo vinculado</p>
+            <p className="text-gray-400 text-xs mt-1">Consulte seu gestor</p>
           </div>
         )}
-      </div>
 
-      {/* Menu rápido */}
-      <div className="px-5 flex-1">
-        <p className="text-slate-500 text-xs uppercase tracking-widest mb-3">Acesso Rápido</p>
-        <div className="grid grid-cols-2 gap-3">
-          {menuItems.map(item => (
+        {/* Ações rápidas */}
+        {veiculo && (
+          <div className="grid grid-cols-2 gap-3">
             <Link
-              key={item.href}
-              href={item.href}
-              className="bg-slate-800 rounded-2xl p-4 border border-slate-700 active:scale-95 transition-transform"
+              href="/app/checklist"
+              className="text-white font-bold rounded-2xl py-4 px-4 flex items-center gap-2 justify-center text-sm active:scale-[.97] transition-transform"
+              style={{ background: 'linear-gradient(135deg,#4B3FE4,#7C3AED)' }}
             >
-              <div className={`${item.color} w-10 h-10 rounded-xl flex items-center justify-center mb-3 text-lg`}>
-                {item.icon}
-              </div>
-              <p className="text-white font-semibold text-sm">{item.label}</p>
-              <p className="text-slate-400 text-xs mt-0.5">{item.desc}</p>
+              <PlayCircle className="w-5 h-5" />
+              Iniciar Viagem
             </Link>
-          ))}
+            <Link
+              href="/app/dados-ativo"
+              className="bg-indigo-50 text-indigo-600 font-bold rounded-2xl py-4 px-4 flex items-center gap-2 justify-center text-sm active:scale-[.97] transition-transform border border-indigo-100"
+            >
+              <History className="w-5 h-5" />
+              Histórico
+            </Link>
+          </div>
+        )}
+
+        {/* Acesso rápido extra */}
+        <div className="grid grid-cols-2 gap-3">
+          <Link href="/app/manutencao"
+            className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 active:scale-[.97] transition-transform">
+            <div className="w-9 h-9 bg-orange-50 rounded-xl flex items-center justify-center mb-2">
+              <span className="text-lg">🔧</span>
+            </div>
+            <p className="text-gray-900 font-semibold text-sm">Manutenção</p>
+            <p className="text-gray-400 text-xs mt-0.5">Solicitar ou acompanhar</p>
+          </Link>
+          <Link href="/app/notificacoes"
+            className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 active:scale-[.97] transition-transform relative">
+            <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center mb-2">
+              <Bell className="w-4 h-4 text-blue-600" />
+              {notifs > 0 && (
+                <span className="absolute top-3 right-3 bg-red-500 text-white text-[8px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {notifs}
+                </span>
+              )}
+            </div>
+            <p className="text-gray-900 font-semibold text-sm">Notificações</p>
+            <p className="text-gray-400 text-xs mt-0.5">Alertas e avisos</p>
+          </Link>
+        </div>
+
+        {/* Checklist pendente */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center flex-shrink-0">
+              <ClipboardCheck className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-gray-900 font-semibold text-sm">Checklist Diário</p>
+              <p className="text-gray-400 text-xs mt-0.5">Realize a inspeção antes de iniciar a rota</p>
+            </div>
+            <Link href="/app/checklist"
+              className="text-indigo-600 text-xs font-bold bg-indigo-50 px-3 py-1.5 rounded-lg">
+              Iniciar
+            </Link>
+          </div>
         </div>
       </div>
 
-      <div className="mt-6">
-        <BottomNav notifCount={notifs} />
-      </div>
+      <BottomNav notifCount={notifs} />
     </div>
   )
 }

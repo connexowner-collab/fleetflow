@@ -2,44 +2,22 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, Truck, Download } from 'lucide-react'
+import { Eye, EyeOff, AlertCircle, Truck, AtSign } from 'lucide-react'
 
 export default function AppLogin() {
   const router = useRouter()
-  const [email, setEmail]           = useState('')
-  const [senha, setSenha]           = useState('')
+  const [email,        setEmail]        = useState('')
+  const [senha,        setSenha]        = useState('')
   const [mostrarSenha, setMostrarSenha] = useState(false)
-  const [loading, setLoading]       = useState(false)
-  const [erro, setErro]             = useState('')
-  const [installPrompt, setInstallPrompt] = useState<Event | null>(null)
-  const [instalado, setInstalado]   = useState(false)
+  const [loading,      setLoading]      = useState(false)
+  const [erro,         setErro]         = useState('')
 
   useEffect(() => {
-    // Captura o prompt de instalação PWA
-    const handler = (e: Event) => {
-      e.preventDefault()
-      setInstallPrompt(e)
-    }
+    // Captura prompt de instalação PWA
+    const handler = (e: Event) => { e.preventDefault() }
     window.addEventListener('beforeinstallprompt', handler)
-
-    // Verifica se já está instalado
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setInstalado(true)
-    }
-
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
-
-  async function instalarApp() {
-    if (!installPrompt) return
-    const prompt = installPrompt as BeforeInstallPromptEvent
-    await prompt.prompt()
-    const { outcome } = await prompt.userChoice
-    if (outcome === 'accepted') {
-      setInstallPrompt(null)
-      setInstalado(true)
-    }
-  }
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault()
@@ -53,10 +31,9 @@ export default function AppLogin() {
       })
       const json = await res.json()
       if (!res.ok) {
-        setErro(json.error ?? 'E-mail ou senha incorretos.')
+        setErro(json.error ?? 'Credenciais inválidas. Tente novamente.')
         return
       }
-      // Redirecionar ao APP
       router.push('/app/home')
     } catch {
       setErro('Erro de conexão. Verifique sua internet.')
@@ -66,34 +43,50 @@ export default function AppLogin() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-900 px-6">
-      {/* Logo */}
-      <div className="flex flex-col items-center justify-center flex-1 gap-8">
-        <div className="text-center">
-          <div className="bg-blue-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-900">
+    <div className="flex flex-col min-h-screen bg-white px-6">
+      <div className="flex flex-col items-center justify-center flex-1 gap-6">
+
+        {/* Logo */}
+        <div className="text-center mb-2">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+               style={{ background: 'linear-gradient(135deg, #4B3FE4 0%, #7C3AED 100%)' }}>
             <Truck className="w-9 h-9 text-white" />
           </div>
-          <h1 className="text-white text-2xl font-bold">FleetFlow</h1>
-          <p className="text-slate-400 text-sm mt-1">App do Motorista</p>
+          <h1 className="text-2xl font-bold text-gray-900">FleetFlow</h1>
+          <p className="text-gray-500 text-sm mt-1">Logística com precisão e controle.</p>
         </div>
 
-        {/* Formulário */}
+        {/* Erro */}
+        {erro && (
+          <div className="w-full bg-red-50 border border-red-200 rounded-2xl px-4 py-3 flex items-center gap-3 text-red-600 text-sm">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            {erro}
+          </div>
+        )}
+
+        {/* Form */}
         <form onSubmit={entrar} className="w-full space-y-4">
           <div>
-            <label className="block text-slate-400 text-xs uppercase tracking-wide mb-2">E-mail</label>
-            <input
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="seu@email.com"
-              className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-3.5 text-sm placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              required
-            />
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Email</label>
+            <div className="relative">
+              <input
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-2xl px-4 py-3.5 pr-11 text-sm placeholder:text-gray-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                required
+              />
+              <AtSign className="w-4 h-4 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2" />
+            </div>
           </div>
 
           <div>
-            <label className="block text-slate-400 text-xs uppercase tracking-wide mb-2">Senha</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest">Senha</label>
+              <button type="button" className="text-xs text-indigo-600 font-semibold">Esqueceu a senha?</button>
+            </div>
             <div className="relative">
               <input
                 type={mostrarSenha ? 'text' : 'password'}
@@ -101,65 +94,36 @@ export default function AppLogin() {
                 value={senha}
                 onChange={e => setSenha(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-3.5 text-sm placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 pr-12"
+                className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-2xl px-4 py-3.5 pr-11 text-sm placeholder:text-gray-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                 required
               />
               <button
                 type="button"
                 onClick={() => setMostrarSenha(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 p-1"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
               >
-                {mostrarSenha ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {mostrarSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
 
-          {erro && (
-            <div className="bg-red-900/50 border border-red-800 rounded-xl px-4 py-3 text-red-300 text-sm">
-              {erro}
-            </div>
-          )}
-
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl py-3.5 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full text-white font-bold rounded-2xl py-4 text-sm transition-all disabled:opacity-60 active:scale-[.98]"
+            style={{ background: 'linear-gradient(135deg, #4B3FE4 0%, #7C3AED 100%)' }}
           >
             {loading ? (
-              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
             ) : 'Entrar'}
           </button>
         </form>
 
-        {/* Botão Instalar APP */}
-        {installPrompt && !instalado && (
-          <button
-            onClick={instalarApp}
-            className="w-full border border-blue-600 text-blue-400 rounded-xl py-3 text-sm font-medium flex items-center justify-center gap-2 hover:bg-blue-900/30 transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Instalar APP no celular
-          </button>
-        )}
-
-        {instalado && (
-          <p className="text-green-400 text-xs text-center flex items-center gap-1">
-            ✓ App instalado no celular
-          </p>
-        )}
+        <p className="text-gray-500 text-sm text-center">
+          Não possui conta?{' '}
+          <span className="text-indigo-600 font-semibold">Contate o administrador</span>
+        </p>
       </div>
-
-      <p className="text-slate-600 text-xs text-center pb-8">
-        FleetFlow v1.0 — Painel de acesso exclusivo para motoristas
-      </p>
     </div>
   )
-}
-
-// Tipo para o evento de instalação PWA
-declare global {
-  interface BeforeInstallPromptEvent extends Event {
-    prompt(): Promise<void>
-    userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
-  }
 }
