@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Verificar se há manutenção aberta (para desabilitar botão)
-  const statusAbertos = ['Aguardando Atendimento', 'Aguardando Manutenção', 'Em Manutenção']
+  const statusAbertos = ['aguardando_atendimento', 'aguardando_manutencao', 'em_manutencao']
   const temAberta = (data ?? []).some(m => statusAbertos.includes(m.status))
 
   return NextResponse.json({ manutencoes: data ?? [], total: count ?? 0, page, limit, tem_aberta: temAberta })
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
   if (!veiculo) return NextResponse.json({ error: 'Veículo não encontrado.' }, { status: 404 })
 
   // Verificar manutenção em aberto
-  const statusAbertos = ['Aguardando Atendimento', 'Aguardando Manutenção', 'Em Manutenção']
+  const statusAbertos = ['aguardando_atendimento', 'aguardando_manutencao', 'em_manutencao']
   const { data: abertas } = await supabase
     .from('manutencoes')
     .select('id')
@@ -107,17 +107,17 @@ export async function POST(request: NextRequest) {
   const { data: manutencao, error } = await supabase
     .from('manutencoes')
     .insert({
-      tenant_id: profile.tenant_id,
+      tenant_id:      profile.tenant_id,
       codigo,
-      motorista_id: profile.id,
+      motorista_id:   profile.id,
       motorista_nome: profile.nome,
-      veiculo_id: veiculo.id,
-      placa: veiculo.placa,
+      veiculo_id:     veiculo.id,
+      veiculo_placa:  veiculo.placa,
       motivo,
-      urgencia: urgencia ?? 'media',
+      urgencia:       urgencia ?? 'media',
       descricao,
-      km_atual: kmAtual,
-      status: 'Aguardando Atendimento',
+      km_atual:       kmAtual,
+      status:         'aguardando_atendimento',
     })
     .select()
     .single()

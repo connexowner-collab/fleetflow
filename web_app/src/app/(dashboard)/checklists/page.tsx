@@ -85,6 +85,24 @@ export default function ChecklistsPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
+  const handleValidar = async (inspection: Inspection) => {
+    const obs = prompt('Observação de validação (obrigatória):')
+    if (!obs?.trim()) return
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('checklists')
+        .update({ status: 'Validado', observacao_validacao: obs.trim() })
+        .eq('id', inspection.id_real);
+      if (error) throw error;
+      setInspections(prev => prev.map(insp => insp.id_real === inspection.id_real ? { ...insp, status: 'Validado' } : insp));
+      setSelectedInspection(null);
+      showToast(`Checklist ${inspection.id} validado com sucesso!`);
+    } catch {
+      showToast('Erro ao validar checklist.');
+    }
+  };
+
   const handleAprovar = async (inspection: Inspection) => {
     try {
       const supabase = createClient();
@@ -95,9 +113,9 @@ export default function ChecklistsPage() {
       if (error) throw error;
       setInspections(prev => prev.map(insp => insp.id_real === inspection.id_real ? { ...insp, status: 'Aprovado' } : insp));
       setSelectedInspection(null);
-      showToast(`Inspeção ${inspection.id} aprovada com sucesso!`);
+      showToast(`Checklist ${inspection.id} aprovado!`);
     } catch {
-      showToast('Erro ao aprovar inspeção.');
+      showToast('Erro ao aprovar checklist.');
     }
   };
 
@@ -106,23 +124,26 @@ export default function ChecklistsPage() {
       const supabase = createClient();
       const { error } = await supabase
         .from('checklists')
-        .update({ status: 'Avaria Grave' })
+        .update({ status: 'Recusado' })
         .eq('id', inspection.id_real);
       if (error) throw error;
-      setInspections(prev => prev.map(insp => insp.id_real === inspection.id_real ? { ...insp, status: 'Avaria Grave' } : insp));
+      setInspections(prev => prev.map(insp => insp.id_real === inspection.id_real ? { ...insp, status: 'Recusado' } : insp));
       setSelectedInspection(null);
-      showToast(`Inspeção ${inspection.id} recusada. Veículo bloqueado para saída.`);
+      showToast(`Checklist ${inspection.id} recusado.`);
     } catch {
-      showToast('Erro ao recusar inspeção.');
+      showToast('Erro ao recusar checklist.');
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch(status) {
-      case 'Aprovado': return <span className="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full font-bold flex items-center w-fit shadow-sm border border-green-200"><CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Liberado</span>;
-      case 'Pendente': return <span className="bg-yellow-100 text-yellow-800 text-xs px-3 py-1 rounded-full font-bold flex items-center w-fit shadow-sm border border-yellow-200"><Clock className="w-3.5 h-3.5 mr-1" /> Em Revisão</span>;
-      case 'Avaria Grave': return <span className="bg-red-100 text-red-800 text-xs px-3 py-1 rounded-full font-bold flex items-center w-fit shadow-sm border border-red-200"><AlertTriangle className="w-3.5 h-3.5 mr-1" /> Risco (Recusado)</span>;
-      default: return <span className="bg-gray-100 text-gray-800 text-xs px-3 py-1 rounded-full font-bold w-fit border border-gray-200">{status}</span>;
+      case 'Aprovado':       return <span className="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full font-bold flex items-center w-fit shadow-sm border border-green-200"><CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Aprovado</span>;
+      case 'Validado':       return <span className="bg-emerald-100 text-emerald-800 text-xs px-3 py-1 rounded-full font-bold flex items-center w-fit shadow-sm border border-emerald-200"><CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Validado</span>;
+      case 'Com Pendências': return <span className="bg-yellow-100 text-yellow-800 text-xs px-3 py-1 rounded-full font-bold flex items-center w-fit shadow-sm border border-yellow-200"><AlertTriangle className="w-3.5 h-3.5 mr-1" /> Com Pendências</span>;
+      case 'Pendente':       return <span className="bg-yellow-100 text-yellow-800 text-xs px-3 py-1 rounded-full font-bold flex items-center w-fit shadow-sm border border-yellow-200"><Clock className="w-3.5 h-3.5 mr-1" /> Em Revisão</span>;
+      case 'Avaria Grave':   return <span className="bg-red-100 text-red-800 text-xs px-3 py-1 rounded-full font-bold flex items-center w-fit shadow-sm border border-red-200"><AlertTriangle className="w-3.5 h-3.5 mr-1" /> Avaria Grave</span>;
+      case 'Recusado':       return <span className="bg-red-100 text-red-800 text-xs px-3 py-1 rounded-full font-bold flex items-center w-fit shadow-sm border border-red-200"><AlertOctagon className="w-3.5 h-3.5 mr-1" /> Recusado</span>;
+      default:               return <span className="bg-gray-100 text-gray-800 text-xs px-3 py-1 rounded-full font-bold w-fit border border-gray-200">{status}</span>;
     }
   };
 
@@ -170,9 +191,12 @@ export default function ChecklistsPage() {
             className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-primary/30 bg-white text-gray-700"
           >
             <option value="">Todos</option>
+            <option value="Aprovado">Aprovado</option>
+            <option value="Com Pendências">Com Pendências</option>
+            <option value="Validado">Validado</option>
             <option value="Pendente">Em Revisão</option>
-            <option value="Aprovado">Liberado</option>
-            <option value="Avaria Grave">Recusado</option>
+            <option value="Avaria Grave">Avaria Grave</option>
+            <option value="Recusado">Recusado</option>
           </select>
         </div>
       </div>
