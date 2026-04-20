@@ -1,5 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+function parseSession(cookie?: string) {
+  if (!cookie) return null
+  try {
+    return JSON.parse(Buffer.from(cookie, 'base64').toString('utf8')) as {
+      email: string; perfil: string; nome: string; sv?: number
+    }
+  } catch { return null }
+}
+
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -14,12 +23,27 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const session = request.cookies.get('fleetflow-session')
+  const rawSession = request.cookies.get('fleetflow-session')?.value
+  const session    = parseSession(rawSession)
 
-  if (!session?.value) {
+  // Sem sessão → redirecionar para o login correto
+  if (!session) {
     const url = request.nextUrl.clone()
-    // APP routes → redirect to /app/login
     url.pathname = pathname.startsWith('/app') ? '/app/login' : '/login'
+    return NextResponse.redirect(url)
+  }
+
+  // Motorista tentando acessar rota de admin → redirecionar para /app/home
+  if (session.perfil === 'motorista' && !pathname.startsWith('/app')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/app/home'
+    return NextResponse.redirect(url)
+  }
+
+  // Gestor/admin tentando acessar rota do app → redirecionar para /
+  if (session.perfil !== 'motorista' && pathname.startsWith('/app/')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/'
     return NextResponse.redirect(url)
   }
 
