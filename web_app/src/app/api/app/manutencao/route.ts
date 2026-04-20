@@ -26,8 +26,8 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from('manutencoes')
-    .select('id, codigo, placa, motivo, urgencia, status, descricao, km_atual, created_at, agendamento_data, oficina, valor_manutencao, observacao_operador', { count: 'exact' })
-    .eq('motorista_id', profile.id)
+    .select('id, veiculo_placa, urgencia, status, descricao, km_agendamento, created_at, observacoes, responsavel', { count: 'exact' })
+    .eq('ator_email', session.email)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
@@ -38,11 +38,36 @@ export async function GET(request: NextRequest) {
   const { data, error, count } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Verificar se há manutenção aberta (para desabilitar botão)
-  const statusAbertos = ['aguardando_atendimento', 'aguardando_manutencao', 'em_manutencao']
-  const temAberta = (data ?? []).some(m => statusAbertos.includes(m.status))
+  const STATUS_MAP: Record<string, string> = {
+    aguardando_atendimento: 'Aguardando Atendimento',
+    aguardando_manutencao:  'Aguardando Manutenção',
+    em_manutencao:          'Em Manutenção',
+    concluida:              'Concluída',
+    cancelada:              'Cancelada',
+    recusado:               'Recusada',
+    manutencao_reprovada:   'Recusada',
+    agendada:               'Aguardando Atendimento',
+    em_andamento:           'Em Manutenção',
+  }
 
-  return NextResponse.json({ manutencoes: data ?? [], total: count ?? 0, page, limit, tem_aberta: temAberta })
+  const manutencoes = (data ?? []).map(m => ({
+    id:           m.id,
+    data_abertura: m.created_at,
+    motivo:       'Corretiva',
+    urgencia:     m.urgencia ?? 'media',
+    descricao:    m.descricao,
+    km:           m.km_agendamento ?? 0,
+    status:       STATUS_MAP[m.status] ?? m.status,
+    observacao_recusa: m.observacoes,
+    timeline:     [],
+    log:          [],
+    anexos:       [],
+  }))
+
+  const statusAbertos = ['Aguardando Atendimento', 'Aguardando Manutenção', 'Em Manutenção']
+  const temAberta = manutencoes.some(m => statusAbertos.includes(m.status))
+
+  return NextResponse.json({ manutencoes, total: count ?? 0, page, limit, tem_aberta: temAberta })
 }
 
 export async function POST(request: NextRequest) {
@@ -95,28 +120,19 @@ export async function POST(request: NextRequest) {
     }, { status: 400 })
   }
 
-  // Gerar código
-  const { count } = await supabase
-    .from('manutencoes')
-    .select('id', { count: 'exact', head: true })
-    .eq('tenant_id', profile.tenant_id)
-
-  const seq = String((count ?? 0) + 1).padStart(5, '0')
-  const codigo = `MAN-${seq}`
-
   const { data: manutencao, error } = await supabase
     .from('manutencoes')
     .insert({
       tenant_id:      profile.tenant_id,
-      codigo,
-      motorista_id:   profile.id,
-      motorista_nome: profile.nome,
       veiculo_id:     veiculo.id,
       veiculo_placa:  veiculo.placa,
-      motivo,
+      tipo:           'corretiva',
       urgencia:       urgencia ?? 'media',
-      descricao,
-      km_atual:       kmAtual,
+      descricao:      motivo ? `[${motivo}] ${descricao}` : descricao,
+      km_agendamento: kmAtual,
+      responsavel:    profile.nome,
+      observacoes:    `Solicitado pelo motorista: ${profile.nome}`,
+      ator_email:     session.email,
       status:         'aguardando_atendimento',
     })
     .select()
@@ -127,5 +143,6 @@ export async function POST(request: NextRequest) {
   // Atualizar KM do veículo
   await supabase.from('veiculos').update({ km_atual: kmAtual }).eq('id', veiculo.id)
 
+  const codigo = `MAN-${String(manutencao.id).slice(-5).toUpperCase()}`
   return NextResponse.json({ manutencao, codigo })
 }
