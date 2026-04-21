@@ -165,6 +165,9 @@ export async function POST(request: NextRequest) {
 
     if (data.user) {
       const updates: Record<string, unknown> = {
+        nome,
+        perfil,
+        email: email.trim().toLowerCase(),
         telas_permitidas: telasPermitidas,
         acesso: acesso ?? 'app',
       }

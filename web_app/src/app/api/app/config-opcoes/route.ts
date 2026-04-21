@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
 
   const { searchParams } = new URL(request.url)
-  const tipo = searchParams.get('tipo')
+  const categoria = searchParams.get('tipo') ?? searchParams.get('categoria')
 
   const supabase = createAdminClient()
 
@@ -21,15 +21,18 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from('config_opcoes')
-    .select('id, tipo, valor, ativo')
+    .select('id, categoria, valor, ativo')
     .eq('tenant_id', profile.tenant_id)
     .eq('ativo', true)
     .order('valor')
 
-  if (tipo) query = query.eq('tipo', tipo)
+  if (categoria) query = query.eq('categoria', categoria)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ opcoes: data ?? [] })
+  // Retorna compatível com ambos os campos (tipo e categoria)
+  const opcoes = (data ?? []).map(o => ({ ...o, tipo: o.categoria }))
+
+  return NextResponse.json({ opcoes })
 }

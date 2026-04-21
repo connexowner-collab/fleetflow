@@ -95,9 +95,20 @@ export async function POST(request: NextRequest) {
   const seq = String((count ?? 0) + 1).padStart(5, '0')
   const codigo = `CHK-${seq}`
 
-  // Parsear itens
+  // Parsear itens (aceita tanto 'itens' quanto 'inspecao' por compatibilidade)
   const itens: Array<{ nome: string; conforme: boolean }> = []
-  try { itens.push(...JSON.parse(String(body.itens ?? '[]'))) } catch { /* */ }
+  try {
+    const raw = body.itens ?? body.inspecao ?? '[]'
+    const parsed = JSON.parse(String(raw))
+    // Suporta formato { nome: string, conforme: bool } ou { [nome]: 'ok'|'avaria' }
+    if (Array.isArray(parsed)) {
+      itens.push(...parsed)
+    } else if (typeof parsed === 'object') {
+      for (const [nome, val] of Object.entries(parsed)) {
+        itens.push({ nome, conforme: val === 'ok' || val === true })
+      }
+    }
+  } catch { /* */ }
 
   // Parsear avarias
   const avarias: Array<{ descricao: string; tipo: string; gravidade: string }> = []
@@ -121,7 +132,9 @@ export async function POST(request: NextRequest) {
       veiculo_id: veiculo.id,
       placa: veiculo.placa,
       veiculo_nome: `${veiculo.marca ?? ''} ${veiculo.modelo}`.trim(),
-      tipo_checklist: String(body.tipo_checklist ?? 'Pré-operação'),
+      tipo_checklist: body.tipo_checklist
+        ? String(body.tipo_checklist)
+        : (body.tipo === 'pos' ? 'Pós-operação' : body.tipo === 'pre' ? 'Pré-operação' : 'Pré-operação'),
       unidade: String(body.unidade ?? ''),
       setor: String(body.setor ?? ''),
       area: String(body.area ?? ''),
@@ -131,7 +144,8 @@ export async function POST(request: NextRequest) {
       status,
       tem_avaria: temAvaria,
       assinatura_base64: String(body.assinatura ?? ''),
-      email_envio: String(body.email ?? session.email),
+      email_envio: String(body.email_envio ?? body.email ?? session.email),
+      cpf_motorista: String(body.cpf ?? ''),
       assinado_em: new Date().toISOString(),
     })
     .select()

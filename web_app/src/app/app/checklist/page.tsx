@@ -38,7 +38,7 @@ function validarCPF(cpf: string) {
   return r === +d[10]
 }
 
-const INSPECAO_ITENS = [
+const INSPECAO_ITENS_DEFAULT = [
   'Pneus', 'Óleo', 'Arrefecimento', 'Lâmpadas',
   'Estepe / triângulo / macaco', 'Cartão combustível',
 ]
@@ -126,6 +126,8 @@ export default function ChecklistPage() {
   const [hasMore,      setHasMore]      = useState(true)
   const [page,         setPage]         = useState(1)
 
+  const [itensInspecao, setItensInspecao] = useState<string[]>(INSPECAO_ITENS_DEFAULT)
+
   const [emFluxo,      setEmFluxo]      = useState(false)
   const [etapa,        setEtapa]        = useState(1)
   const [enviando,     setEnviando]     = useState(false)
@@ -149,7 +151,7 @@ export default function ChecklistPage() {
 
   // Step 3 — inspeção
   const [inspecao,   setInspecao]   = useState<Record<string, 'ok' | 'avaria'>>(
-    Object.fromEntries(INSPECAO_ITENS.map(k => [k, 'ok' as const]))
+    Object.fromEntries(itensInspecao.map(k => [k, 'ok' as const]))
   )
   const [observacao, setObservacao] = useState('')
 
@@ -182,11 +184,23 @@ export default function ChecklistPage() {
   useEffect(() => {
     async function init() {
       try {
-        const res  = await fetch('/api/auth/profile')
-        const json = await res.json()
-        const p: Profile = json.profile ?? json
+        const [profRes, itensRes] = await Promise.all([
+          fetch('/api/auth/profile'),
+          fetch('/api/app/config-opcoes?tipo=item_inspecao'),
+        ])
+        const profJson = await profRes.json()
+        const p: Profile = profJson.profile ?? profJson
         setProfile(p)
         setEmailEnvio(p.email ?? '')
+
+        // Itens de inspeção configuráveis — usa default se vazio
+        const itensJson = await itensRes.json()
+        const itensAPI: string[] = (itensJson.opcoes ?? []).map((o: { valor: string }) => o.valor)
+        if (itensAPI.length > 0) {
+          setItensInspecao(itensAPI)
+          setInspecao(Object.fromEntries(itensAPI.map(k => [k, 'ok' as const])))
+        }
+
         if (p.veiculo_id) {
           const vRes  = await fetch('/api/app/veiculo')
           const vJson = await vRes.json()
@@ -219,7 +233,7 @@ export default function ChecklistPage() {
     setTipoChecklist('pre'); setKmAtual(''); setKmErro('')
     setFotoFrente(null); setFotoFrentePreview(''); setFotoTras(null); setFotoTrasPreview('')
     setFotoEsq(null); setFotoEsqPreview(''); setFotoDir(null); setFotoDirPreview('')
-    setInspecao(Object.fromEntries(INSPECAO_ITENS.map(k => [k, 'ok' as const])))
+    setInspecao(Object.fromEntries(itensInspecao.map(k => [k, 'ok' as const])))
     setObservacao(''); setAvarias([]); setAssinatura(''); setCpf(''); setCpfErro('')
   }
 
@@ -501,7 +515,7 @@ export default function ChecklistPage() {
                 <>
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-5 pt-4 pb-2">Itens de Inspeção</p>
-                    {INSPECAO_ITENS.map((item, i) => (
+                    {itensInspecao.map((item, i) => (
                       <div key={item} className={`flex items-center justify-between px-5 py-3.5 ${i > 0 ? 'border-t border-gray-50' : ''}`}>
                         <span className="text-gray-800 text-sm font-medium">{item}</span>
                         <div className="flex gap-2">
