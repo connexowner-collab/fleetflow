@@ -34,6 +34,11 @@ export default function AppLogin() {
         setErro(json.error ?? 'Credenciais inválidas. Tente novamente.')
         return
       }
+      if (json.perfil && json.perfil !== 'motorista') {
+        await fetch('/api/auth/login', { method: 'DELETE' })
+        setErro('Acesso negado. Este aplicativo é exclusivo para motoristas.')
+        return
+      }
       router.push('/app/home')
     } catch {
       setErro('Erro de conexão. Verifique sua internet.')
