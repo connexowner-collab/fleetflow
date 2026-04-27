@@ -408,7 +408,7 @@ export default function ChecklistPage() {
 
   if (emFluxo) {
     return (
-      <div className="flex flex-col min-h-screen bg-[#F4F6FB]">
+      <div className="flex flex-col h-[100dvh] bg-[#F4F6FB]">
 
         {/* Modal abandonar */}
         {showAbandon && (
@@ -475,7 +475,7 @@ export default function ChecklistPage() {
         {etapa < 7 && (
           <>
             {/* Header */}
-            <div className="bg-white px-5 pt-12 pb-4">
+            <div className="bg-white px-5 pt-12 pb-4 shrink-0">
               <div className="flex items-center gap-3 mb-4">
                 <button onClick={tryVoltar} className="p-1.5 bg-gray-100 rounded-xl">
                   <ChevronLeft className="w-4 h-4 text-gray-600" />
@@ -828,7 +828,7 @@ export default function ChecklistPage() {
 
             {/* Rodapé nav (etapas 1-5, não na 6 pois botão enviar está inline) */}
             {etapa < 6 && (
-              <div className="flex gap-3 px-5 pb-6 pt-2 bg-[#F4F6FB]">
+              <div className="flex gap-3 px-5 pb-6 pt-2 bg-[#F4F6FB] shrink-0">
                 <button onClick={tryVoltar}
                   className="flex-1 bg-white border border-gray-200 text-gray-700 rounded-2xl py-3.5 font-semibold text-sm flex items-center justify-center gap-1">
                   <ChevronLeft className="w-4 h-4" /> Voltar
