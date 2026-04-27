@@ -4,18 +4,19 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import {
   ChevronLeft, ChevronRight, ClipboardCheck, Plus, FileText,
   AlertTriangle, CheckCircle2, Camera, Trash2, X, Loader2,
-  Car, Bell,
+  Car, Bell, ExternalLink,
 } from 'lucide-react'
 import Link from 'next/link'
 import BottomNav from '../components/BottomNav'
 
 interface ChecklistItem {
   id: string; data_hora: string; tipo: 'pre' | 'pos'
-  status: string; km?: string | number
+  status: string; km?: string | number; pdf_url?: string | null
 }
 interface Ativo { placa: string; chassi: string; modelo: string; marca: string; km_atual: number }
 interface Profile { nome: string; email: string; veiculo_id?: string }
 interface Avaria { descricao: string; tipo: string; gravidade: string; foto: File | null; fotoPreview: string }
+interface Opcao { valor: string }
 
 function formatCPF(v: string) {
   const d = v.replace(/\D/g, '').slice(0, 11)
@@ -44,14 +45,16 @@ const INSPECAO_ITENS_DEFAULT = [
 ]
 
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
-  Aprovado:         { label: 'Aprovado',        cls: 'bg-green-100 text-green-700'   },
-  'Com Pendências': { label: 'Com Pendências',  cls: 'bg-yellow-100 text-yellow-700' },
+  Aprovado:         { label: 'Aprovado',        cls: 'bg-green-100 text-green-700'    },
+  'Com Pendências': { label: 'Com Pendências',  cls: 'bg-yellow-100 text-yellow-700'  },
   Validado:         { label: 'Validado',        cls: 'bg-emerald-100 text-emerald-700'},
-  Recusado:         { label: 'Recusado',        cls: 'bg-red-100 text-red-700'       },
-  Pendente:         { label: 'Pendente',        cls: 'bg-gray-100 text-gray-600'     },
+  Recusado:         { label: 'Recusado',        cls: 'bg-red-100 text-red-700'        },
+  Pendente:         { label: 'Pendente',        cls: 'bg-gray-100 text-gray-600'      },
 }
 
-function ProgressBar({ etapa, total = 5 }: { etapa: number; total?: number }) {
+const MAX_FOTO_MB = 10
+
+function ProgressBar({ etapa, total = 6 }: { etapa: number; total?: number }) {
   return (
     <div className="w-full bg-gray-200 rounded-full h-1">
       <div className="h-1 rounded-full transition-all duration-500"
@@ -101,7 +104,7 @@ function SignatureCanvas({ onChange }: { onChange: (data: string) => void }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Assinatura</span>
+        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Assinatura *</span>
         <button type="button" onClick={clear} className="text-xs text-red-500 flex items-center gap-1 font-medium">
           <Trash2 className="w-3 h-3" /> Limpar
         </button>
@@ -126,20 +129,37 @@ export default function ChecklistPage() {
   const [hasMore,      setHasMore]      = useState(true)
   const [page,         setPage]         = useState(1)
 
-  const [itensInspecao, setItensInspecao] = useState<string[]>(INSPECAO_ITENS_DEFAULT)
+  // Config options loaded from API
+  const [itensInspecao,    setItensInspecao]    = useState<string[]>(INSPECAO_ITENS_DEFAULT)
+  const [tiposChecklist,   setTiposChecklist]   = useState<Opcao[]>([])
+  const [unidades,         setUnidades]         = useState<Opcao[]>([])
+  const [setores,          setSetores]          = useState<Opcao[]>([])
+  const [areas,            setAreas]            = useState<Opcao[]>([])
+  const [tiposAvaria,      setTiposAvaria]      = useState<Opcao[]>([])
+  const [gravidadesAvaria, setGravidadesAvaria] = useState<Opcao[]>([])
 
   const [emFluxo,      setEmFluxo]      = useState(false)
   const [etapa,        setEtapa]        = useState(1)
   const [enviando,     setEnviando]     = useState(false)
   const [checklistId,  setChecklistId]  = useState<string | null>(null)
   const [showAbandon,  setShowAbandon]  = useState(false)
+  // Pop-up obrigatório de avaria (D-06)
+  const [showPopupAvaria, setShowPopupAvaria] = useState(false)
 
-  // Step 1
-  const [tipoChecklist, setTipoChecklist] = useState<'pre' | 'pos'>('pre')
-  const [kmAtual,       setKmAtual]       = useState('')
-  const [kmErro,        setKmErro]        = useState('')
+  // Etapa 1: veículo (somente leitura)
+  // Etapa 2: dados do motorista
+  const [tipoChecklist, setTipoChecklist] = useState('')
+  const [unidade,       setUnidade]       = useState('')
+  const [setor,         setSetor]         = useState('')
+  const [area,          setArea]          = useState('')
 
-  // Step 2 — fotos
+  // Etapa 3: inspeção + KM
+  const [kmAtual,  setKmAtual]  = useState('')
+  const [kmErro,   setKmErro]   = useState('')
+  const [inspecao, setInspecao] = useState<Record<string, 'ok' | 'avaria'>>({})
+  const [observacao, setObservacao] = useState('')
+
+  // Etapa 4: fotos
   const [fotoFrente,        setFotoFrente]        = useState<File | null>(null)
   const [fotoFrentePreview, setFotoFrentePreview] = useState('')
   const [fotoTras,          setFotoTras]          = useState<File | null>(null)
@@ -148,17 +168,12 @@ export default function ChecklistPage() {
   const [fotoEsqPreview,    setFotoEsqPreview]    = useState('')
   const [fotoDir,           setFotoDir]           = useState<File | null>(null)
   const [fotoDirPreview,    setFotoDirPreview]    = useState('')
+  const [fotoErro,          setFotoErro]          = useState('')
 
-  // Step 3 — inspeção
-  const [inspecao,   setInspecao]   = useState<Record<string, 'ok' | 'avaria'>>(
-    Object.fromEntries(itensInspecao.map(k => [k, 'ok' as const]))
-  )
-  const [observacao, setObservacao] = useState('')
-
-  // Step 4 — avarias
+  // Etapa 5: avarias
   const [avarias, setAvarias] = useState<Avaria[]>([])
 
-  // Step 5 — assinatura
+  // Etapa 6: assinatura
   const [assinatura,  setAssinatura]  = useState('')
   const [cpf,         setCpf]         = useState('')
   const [cpfErro,     setCpfErro]     = useState('')
@@ -174,6 +189,7 @@ export default function ChecklistPage() {
         tipo:     (c.tipo_checklist as string)?.includes('Pós') ? 'pos' : 'pre',
         status:   String(c.status ?? 'Pendente'),
         km:       c.km_atual,
+        pdf_url:  (c.pdf_url as string | null) ?? null,
       }))
       setHistorico(prev => replace ? items : [...prev, ...items])
       setHasMore(items.length === 20)
@@ -184,22 +200,38 @@ export default function ChecklistPage() {
   useEffect(() => {
     async function init() {
       try {
-        const [profRes, itensRes] = await Promise.all([
+        const [profRes, itensRes, tiposRes, unidadesRes, setoresRes, areasRes, tiposAvariaRes, gravidadesRes] = await Promise.all([
           fetch('/api/auth/profile'),
           fetch('/api/app/config-opcoes?tipo=item_inspecao'),
+          fetch('/api/app/config-opcoes?tipo=tipo_checklist'),
+          fetch('/api/app/config-opcoes?tipo=unidade'),
+          fetch('/api/app/config-opcoes?tipo=setor'),
+          fetch('/api/app/config-opcoes?tipo=area'),
+          fetch('/api/app/config-opcoes?tipo=tipo_avaria'),
+          fetch('/api/app/config-opcoes?tipo=gravidade_avaria'),
         ])
         const profJson = await profRes.json()
         const p: Profile = profJson.profile ?? profJson
         setProfile(p)
         setEmailEnvio(p.email ?? '')
 
-        // Itens de inspeção configuráveis — usa default se vazio
-        const itensJson = await itensRes.json()
-        const itensAPI: string[] = (itensJson.opcoes ?? []).map((o: { valor: string }) => o.valor)
+        const itensAPI: string[] = ((await itensRes.json()).opcoes ?? []).map((o: Opcao) => o.valor)
         if (itensAPI.length > 0) {
           setItensInspecao(itensAPI)
           setInspecao(Object.fromEntries(itensAPI.map(k => [k, 'ok' as const])))
+        } else {
+          setInspecao(Object.fromEntries(INSPECAO_ITENS_DEFAULT.map(k => [k, 'ok' as const])))
         }
+
+        const tiposAPI: Opcao[] = (await tiposRes.json()).opcoes ?? []
+        setTiposChecklist(tiposAPI)
+        if (tiposAPI.length > 0) setTipoChecklist(tiposAPI[0].valor)
+
+        setUnidades((await unidadesRes.json()).opcoes ?? [])
+        setSetores((await setoresRes.json()).opcoes ?? [])
+        setAreas((await areasRes.json()).opcoes ?? [])
+        setTiposAvaria((await tiposAvariaRes.json()).opcoes ?? [])
+        setGravidadesAvaria((await gravidadesRes.json()).opcoes ?? [])
 
         if (p.veiculo_id) {
           const vRes  = await fetch('/api/app/veiculo')
@@ -213,6 +245,7 @@ export default function ChecklistPage() {
     init()
   }, [loadList])
 
+  // Infinite scroll sentinel
   const sentinelRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!sentinelRef.current) return
@@ -229,10 +262,15 @@ export default function ChecklistPage() {
 
   function iniciar() {
     if (!ativo) return
-    setEtapa(1); setEmFluxo(true); setChecklistId(null)
-    setTipoChecklist('pre'); setKmAtual(''); setKmErro('')
-    setFotoFrente(null); setFotoFrentePreview(''); setFotoTras(null); setFotoTrasPreview('')
-    setFotoEsq(null); setFotoEsqPreview(''); setFotoDir(null); setFotoDirPreview('')
+    setEtapa(1); setEmFluxo(true); setChecklistId(null); setShowPopupAvaria(false)
+    setTipoChecklist(tiposChecklist[0]?.valor ?? '')
+    setUnidade(''); setSetor(''); setArea('')
+    setKmAtual(''); setKmErro('')
+    setFotoFrente(null); setFotoFrentePreview('')
+    setFotoTras(null); setFotoTrasPreview('')
+    setFotoEsq(null); setFotoEsqPreview('')
+    setFotoDir(null); setFotoDirPreview('')
+    setFotoErro('')
     setInspecao(Object.fromEntries(itensInspecao.map(k => [k, 'ok' as const])))
     setObservacao(''); setAvarias([]); setAssinatura(''); setCpf(''); setCpfErro('')
   }
@@ -242,16 +280,40 @@ export default function ChecklistPage() {
     setEtapa(e => e - 1)
   }
 
+  function validarFoto(file: File): string {
+    if (file.size > MAX_FOTO_MB * 1024 * 1024)
+      return `Foto "${file.name}" excede ${MAX_FOTO_MB}MB. Reduza o tamanho e tente novamente.`
+    return ''
+  }
+
   function avancar() {
-    if (etapa === 1) {
+    // Etapa 1: identificação — sem validação (somente leitura)
+    if (etapa === 2) {
+      if (!tipoChecklist) return
+    }
+    if (etapa === 3) {
       const kmA = ativo?.km_atual ?? 0
       if (!kmAtual || +kmAtual < kmA) { setKmErro(`KM atual deve ser ≥ ${kmA.toLocaleString('pt-BR')}`); return }
       setKmErro('')
     }
-    if (etapa === 2) {
+    if (etapa === 4) {
       if (!fotoFrente || !fotoTras) return
+      setFotoErro('')
+      // Pop-up obrigatório de avaria (D-06)
+      setShowPopupAvaria(true)
+      return
     }
-    if (etapa < 5) setEtapa(e => e + 1)
+    if (etapa < 6) setEtapa(e => e + 1)
+  }
+
+  function responderPopupAvaria(temAvaria: boolean) {
+    setShowPopupAvaria(false)
+    if (temAvaria) {
+      setEtapa(5) // vai para tela de avarias
+    } else {
+      setAvarias([])
+      setEtapa(6) // pula direto para assinatura
+    }
   }
 
   function fileToPreview(file: File, setter: (s: string) => void) {
@@ -260,8 +322,12 @@ export default function ChecklistPage() {
     r.readAsDataURL(file)
   }
 
-  function toggleInspecao(item: string) {
-    setInspecao(prev => ({ ...prev, [item]: prev[item] === 'ok' ? 'avaria' : 'ok' }))
+  function handleFoto(file: File, setFile: (f: File) => void, setPreview: (s: string) => void) {
+    const err = validarFoto(file)
+    if (err) { setFotoErro(err); return }
+    setFotoErro('')
+    setFile(file)
+    fileToPreview(file, setPreview)
   }
 
   function adicionarAvaria() {
@@ -272,6 +338,9 @@ export default function ChecklistPage() {
     setAvarias(prev => {
       const next = [...prev]
       if (field === 'foto' && value instanceof File) {
+        const err = validarFoto(value)
+        if (err) { setFotoErro(err); return prev }
+        setFotoErro('')
         fileToPreview(value, preview => {
           setAvarias(p => { const n = [...p]; n[idx] = { ...n[idx], foto: value, fotoPreview: preview }; return n })
         })
@@ -283,6 +352,10 @@ export default function ChecklistPage() {
     })
   }
 
+  function avariasSemFoto(): boolean {
+    return avarias.some(a => !a.foto)
+  }
+
   async function enviar() {
     if (!validarCPF(cpf)) { setCpfErro('CPF inválido'); return }
     setCpfErro('')
@@ -290,18 +363,21 @@ export default function ChecklistPage() {
     setEnviando(true)
     try {
       const form = new FormData()
-      form.append('tipo',        tipoChecklist)
-      form.append('km_atual',    kmAtual)
-      form.append('inspecao',    JSON.stringify(inspecao))
-      form.append('observacao',  observacao)
-      form.append('cpf',         cpf)
-      form.append('email_envio', emailEnvio)
-      form.append('assinatura',  assinatura)
-      form.append('tem_avaria',  String(avarias.length > 0))
-      if (fotoFrente) form.append('foto_frente',        fotoFrente)
-      if (fotoTras)   form.append('foto_tras',          fotoTras)
-      if (fotoEsq)    form.append('foto_lateral_esq',   fotoEsq)
-      if (fotoDir)    form.append('foto_lateral_dir',   fotoDir)
+      form.append('tipo_checklist', tipoChecklist)
+      form.append('unidade',       unidade)
+      form.append('setor',         setor)
+      form.append('area',          area)
+      form.append('km_atual',      kmAtual)
+      form.append('inspecao',      JSON.stringify(inspecao))
+      form.append('observacao',    observacao)
+      form.append('cpf',           cpf)
+      form.append('email_envio',   emailEnvio)
+      form.append('assinatura',    assinatura)
+      form.append('tem_avaria',    String(avarias.length > 0))
+      if (fotoFrente) form.append('foto_frente',       fotoFrente)
+      if (fotoTras)   form.append('foto_tras',         fotoTras)
+      if (fotoEsq)    form.append('foto_lateral_esq',  fotoEsq)
+      if (fotoDir)    form.append('foto_lateral_dir',  fotoDir)
       avarias.forEach((a, i) => {
         form.append(`avaria_${i}_descricao`, a.descricao)
         form.append(`avaria_${i}_tipo`,      a.tipo)
@@ -311,21 +387,21 @@ export default function ChecklistPage() {
       const res  = await fetch('/api/app/checklist', { method: 'POST', body: form })
       const json = await res.json()
       setChecklistId(json.codigo ?? json.id ?? 'CHK-OK')
-      setEtapa(6)
+      setEtapa(7) // tela de sucesso
       await loadList(1, true)
     } catch { alert('Erro ao enviar. Tente novamente.') }
     finally { setEnviando(false) }
   }
 
   const now = new Date()
-  const dataHoje = now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
+  const dataHoje  = now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
   const horaAgora = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
   const FOTOS_SLOTS = [
-    { label: 'Frente',      preview: fotoFrentePreview, setter: (f: File) => { setFotoFrente(f); fileToPreview(f, setFotoFrentePreview) } },
-    { label: 'Traseira',    preview: fotoTrasPreview,   setter: (f: File) => { setFotoTras(f);   fileToPreview(f, setFotoTrasPreview)   } },
-    { label: 'Lateral Esq', preview: fotoEsqPreview,   setter: (f: File) => { setFotoEsq(f);    fileToPreview(f, setFotoEsqPreview)    } },
-    { label: 'Lateral Dir', preview: fotoDirPreview,   setter: (f: File) => { setFotoDir(f);    fileToPreview(f, setFotoDirPreview)    } },
+    { label: 'Frente *',   obrig: true,  preview: fotoFrentePreview, setter: (f: File) => handleFoto(f, setFotoFrente, setFotoFrentePreview) },
+    { label: 'Traseira *', obrig: true,  preview: fotoTrasPreview,   setter: (f: File) => handleFoto(f, setFotoTras, setFotoTrasPreview)     },
+    { label: 'Lat. Esq',   obrig: false, preview: fotoEsqPreview,    setter: (f: File) => handleFoto(f, setFotoEsq, setFotoEsqPreview)       },
+    { label: 'Lat. Dir',   obrig: false, preview: fotoDirPreview,    setter: (f: File) => handleFoto(f, setFotoDir, setFotoDirPreview)       },
   ]
 
   // ─── Render fluxo ───────────────────────────────────────────────────────────
@@ -355,8 +431,29 @@ export default function ChecklistPage() {
           </div>
         )}
 
-        {/* Sucesso (etapa 6) */}
-        {etapa === 6 && (
+        {/* Pop-up obrigatório de avaria (D-06) */}
+        {showPopupAvaria && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
+            <div className="bg-white rounded-3xl w-full max-w-md p-6 text-center">
+              <AlertTriangle className="w-10 h-10 text-yellow-400 mx-auto mb-3" />
+              <h3 className="text-gray-900 font-bold text-lg mb-2">O ativo tem avaria?</h3>
+              <p className="text-gray-500 text-sm mb-6">Registre qualquer dano, defeito ou irregularidade encontrada.</p>
+              <div className="flex gap-3">
+                <button onClick={() => responderPopupAvaria(false)}
+                  className="flex-1 py-3 rounded-2xl border border-gray-200 text-gray-700 font-semibold text-sm">
+                  NÃO
+                </button>
+                <button onClick={() => responderPopupAvaria(true)}
+                  className="flex-1 py-3 rounded-2xl bg-yellow-500 text-white font-semibold text-sm">
+                  SIM — Registrar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sucesso (etapa 7) */}
+        {etapa === 7 && (
           <div className="flex flex-col items-center justify-center flex-1 p-8 text-center">
             <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
               <CheckCircle2 className="w-10 h-10 text-green-600" />
@@ -375,7 +472,7 @@ export default function ChecklistPage() {
           </div>
         )}
 
-        {etapa < 6 && (
+        {etapa < 7 && (
           <>
             {/* Header */}
             <div className="bg-white px-5 pt-12 pb-4">
@@ -392,7 +489,7 @@ export default function ChecklistPage() {
                 </div>
               </div>
               <h1 className="text-2xl font-bold text-gray-900">Checklist Diário</h1>
-              <p className="text-gray-500 text-sm mt-0.5">Etapa {etapa} de 5</p>
+              <p className="text-gray-500 text-sm mt-0.5">Etapa {etapa} de 6</p>
               <div className="mt-3">
                 <ProgressBar etapa={etapa} />
               </div>
@@ -400,10 +497,9 @@ export default function ChecklistPage() {
 
             <div className="flex-1 overflow-y-auto px-5 pt-4 pb-8 space-y-4">
 
-              {/* ── Etapa 1: Identificação + Turno + KM ── */}
-              {etapa === 1 && (
+              {/* ── Etapa 1: Identificação do Veículo ── */}
+              {etapa === 1 && ativo && (
                 <>
-                  {/* Card do veículo */}
                   <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100">
                     <div className="relative h-28"
                          style={{ background: 'linear-gradient(135deg,#4B3FE4 0%,#7C3AED 60%,#A78BFA 100%)' }}>
@@ -414,8 +510,8 @@ export default function ChecklistPage() {
                         <span className="bg-green-400 text-green-900 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 w-fit mb-1">
                           <CheckCircle2 className="w-3 h-3" /> ATIVO
                         </span>
-                        <p className="text-white font-bold">{ativo?.marca} {ativo?.modelo}</p>
-                        <p className="text-white/80 text-sm tracking-widest">{ativo?.placa}</p>
+                        <p className="text-white font-bold">{ativo.marca} {ativo.modelo}</p>
+                        <p className="text-white/80 text-sm tracking-widest">{ativo.placa}</p>
                       </div>
                     </div>
                     <div className="bg-white px-4 py-3 flex items-center justify-between">
@@ -429,33 +525,105 @@ export default function ChecklistPage() {
                       </div>
                     </div>
                   </div>
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-5 pt-4 pb-2">Dados do Veículo</p>
+                    {[
+                      { label: 'Placa',   value: ativo.placa   },
+                      { label: 'Chassi',  value: ativo.chassi  },
+                      { label: 'Modelo',  value: `${ativo.marca} ${ativo.modelo}` },
+                      { label: 'KM Atual',value: `${ativo.km_atual?.toLocaleString('pt-BR')} km` },
+                    ].map(row => (
+                      <div key={row.label} className="flex items-center justify-between px-5 py-3 border-t border-gray-50">
+                        <span className="text-gray-500 text-sm">{row.label}</span>
+                        <span className="text-gray-900 font-bold text-sm">{row.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
 
-                  {/* Turno */}
-                  <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Turno de Inspeção</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { value: 'pre', label: 'Pré-operação', icon: '🌅' },
-                        { value: 'pos', label: 'Pós-operação', icon: '🌆' },
-                      ].map(t => (
-                        <button key={t.value}
-                          onClick={() => setTipoChecklist(t.value as 'pre' | 'pos')}
-                          className={`py-4 rounded-2xl border-2 text-sm font-bold transition-colors flex flex-col items-center gap-1 ${
-                            tipoChecklist === t.value
-                              ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                              : 'border-gray-200 bg-white text-gray-500'
-                          }`}>
-                          <span className="text-xl">{t.icon}</span>
-                          {t.label}
-                        </button>
-                      ))}
+              {/* ── Etapa 2: Dados do Motorista ── */}
+              {etapa === 2 && (
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-4">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Dados do Motorista</p>
+
+                  {/* Nome (somente leitura) */}
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Motorista</label>
+                    <div className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 font-semibold">
+                      {profile?.nome ?? '—'}
                     </div>
                   </div>
 
+                  {/* Tipo do Checklist */}
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Tipo do Checklist *</label>
+                    {tiposChecklist.length > 0 ? (
+                      <select value={tipoChecklist} onChange={e => setTipoChecklist(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:border-indigo-500">
+                        <option value="">Selecione...</option>
+                        {tiposChecklist.map(o => <option key={o.valor} value={o.valor}>{o.valor}</option>)}
+                      </select>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { value: 'Pré-operação', icon: '🌅' },
+                          { value: 'Pós-operação', icon: '🌆' },
+                        ].map(t => (
+                          <button key={t.value}
+                            onClick={() => setTipoChecklist(t.value)}
+                            className={`py-4 rounded-2xl border-2 text-sm font-bold transition-colors flex flex-col items-center gap-1 ${
+                              tipoChecklist === t.value
+                                ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                                : 'border-gray-200 bg-white text-gray-500'
+                            }`}>
+                            <span className="text-xl">{t.icon}</span>
+                            {t.value}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Unidade */}
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Unidade</label>
+                    <select value={unidade} onChange={e => setUnidade(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:border-indigo-500">
+                      <option value="">Selecione...</option>
+                      {unidades.map(o => <option key={o.valor} value={o.valor}>{o.valor}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Setor */}
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Setor</label>
+                    <select value={setor} onChange={e => setSetor(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:border-indigo-500">
+                      <option value="">Selecione...</option>
+                      {setores.map(o => <option key={o.valor} value={o.valor}>{o.valor}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Área */}
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Área</label>
+                    <select value={area} onChange={e => setArea(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:border-indigo-500">
+                      <option value="">Selecione...</option>
+                      {areas.map(o => <option key={o.valor} value={o.valor}>{o.valor}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Etapa 3: Inspeção Técnica ── */}
+              {etapa === 3 && (
+                <>
                   {/* KM */}
                   <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">KM Atual</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">KM Atual *</p>
                       <span className="text-xs text-gray-400">Anterior: {ativo?.km_atual?.toLocaleString('pt-BR')} km</span>
                     </div>
                     <input
@@ -468,85 +636,30 @@ export default function ChecklistPage() {
                     />
                     {kmErro && <p className="text-red-500 text-xs mt-1.5">{kmErro}</p>}
                   </div>
-                </>
-              )}
 
-              {/* ── Etapa 2: Fotos ── */}
-              {etapa === 2 && (
-                <>
-                  <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Evidência Fotográfica</p>
-                    <p className="text-gray-500 text-xs mb-4">Fotografe o veículo nos 4 ângulos obrigatórios.</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {FOTOS_SLOTS.map(slot => (
-                        <label key={slot.label} className="cursor-pointer active:opacity-80">
-                          <input type="file" accept="image/*" capture="environment" className="sr-only"
-                            onChange={e => { const f = e.target.files?.[0]; if (f) slot.setter(f) }} />
-                          <div className={`aspect-square rounded-2xl overflow-hidden border-2 flex items-center justify-center ${
-                            slot.preview ? 'border-indigo-300' : 'border-dashed border-gray-300'
-                          }`}>
-                            {slot.preview ? (
-                              <img src={slot.preview} alt={slot.label} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="flex flex-col items-center gap-2 text-gray-400">
-                                <Camera className="w-8 h-8" />
-                                <span className="text-xs font-medium">{slot.label}</span>
-                              </div>
-                            )}
-                          </div>
-                          {slot.preview && (
-                            <p className="text-center text-[10px] font-bold text-indigo-600 mt-1">{slot.label}</p>
-                          )}
-                          {!slot.preview && (
-                            <p className="text-center text-[10px] text-gray-400 mt-1">{slot.label}</p>
-                          )}
-                        </label>
-                      ))}
-                    </div>
-                    {(!fotoFrente || !fotoTras) && (
-                      <p className="text-red-500 text-xs text-center mt-3">Fotos Frente e Traseira são obrigatórias.</p>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* ── Etapa 3: Inspeção ── */}
-              {etapa === 3 && (
-                <>
+                  {/* Itens de inspeção */}
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-5 pt-4 pb-2">Itens de Inspeção</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-5 pt-4 pb-2">Itens de Inspeção *</p>
                     {itensInspecao.map((item, i) => (
                       <div key={item} className={`flex items-center justify-between px-5 py-3.5 ${i > 0 ? 'border-t border-gray-50' : ''}`}>
                         <span className="text-gray-800 text-sm font-medium">{item}</span>
                         <div className="flex gap-2">
                           <button
                             onClick={() => setInspecao(prev => ({ ...prev, [item]: 'ok' }))}
-                            className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${
-                              inspecao[item] === 'ok'
-                                ? 'bg-green-500 text-white'
-                                : 'bg-gray-100 text-gray-400'
-                            }`}>
+                            className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${inspecao[item] === 'ok' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
                             OK
                           </button>
                           <button
-                            onClick={() => {
-                              setInspecao(prev => ({ ...prev, [item]: 'avaria' }))
-                              if (!avarias.some(a => a.tipo === item)) {
-                                adicionarAvaria()
-                              }
-                            }}
-                            className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${
-                              inspecao[item] === 'avaria'
-                                ? 'bg-red-500 text-white'
-                                : 'bg-gray-100 text-gray-400'
-                            }`}>
-                            Avaria
+                            onClick={() => setInspecao(prev => ({ ...prev, [item]: 'avaria' }))}
+                            className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${inspecao[item] === 'avaria' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                            N/C
                           </button>
                         </div>
                       </div>
                     ))}
                   </div>
 
+                  {/* Observações */}
                   <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">
                       Observações <span className="normal-case text-gray-300">(opcional)</span>
@@ -563,14 +676,50 @@ export default function ChecklistPage() {
                 </>
               )}
 
-              {/* ── Etapa 4: Avarias ── */}
+              {/* ── Etapa 4: Evidência Fotográfica ── */}
               {etapa === 4 && (
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Evidência Fotográfica</p>
+                  <p className="text-gray-500 text-xs mb-4">Frente e Traseira obrigatórias. Máx {MAX_FOTO_MB}MB por foto.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {FOTOS_SLOTS.map(slot => (
+                      <label key={slot.label} className="cursor-pointer active:opacity-80">
+                        <input type="file" accept="image/*" capture="environment" className="sr-only"
+                          onChange={e => { const f = e.target.files?.[0]; if (f) slot.setter(f) }} />
+                        <div className={`aspect-square rounded-2xl overflow-hidden border-2 flex items-center justify-center ${
+                          slot.preview ? 'border-indigo-300' : slot.obrig ? 'border-dashed border-red-200' : 'border-dashed border-gray-300'
+                        }`}>
+                          {slot.preview ? (
+                            <img src={slot.preview} alt={slot.label} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="flex flex-col items-center gap-2 text-gray-400">
+                              <Camera className="w-8 h-8" />
+                              <span className="text-xs font-medium">{slot.label}</span>
+                            </div>
+                          )}
+                        </div>
+                        <p className={`text-center text-[10px] mt-1 font-medium ${slot.preview ? 'text-indigo-600' : slot.obrig ? 'text-red-400' : 'text-gray-400'}`}>
+                          {slot.label}
+                        </p>
+                      </label>
+                    ))}
+                  </div>
+                  {fotoErro && <p className="text-red-500 text-xs mt-3 text-center">{fotoErro}</p>}
+                  {(!fotoFrente || !fotoTras) && !fotoErro && (
+                    <p className="text-red-400 text-xs text-center mt-3">Fotos Frente e Traseira são obrigatórias.</p>
+                  )}
+                </div>
+              )}
+
+              {/* ── Etapa 5: Avaria ── */}
+              {etapa === 5 && (
                 <>
+                  {fotoErro && <p className="text-red-500 text-xs bg-red-50 px-3 py-2 rounded-xl">{fotoErro}</p>}
                   {avarias.length === 0 ? (
                     <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 text-center">
                       <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-3" />
-                      <p className="text-gray-800 font-semibold">Nenhuma avaria registrada</p>
-                      <p className="text-gray-400 text-sm mt-1">Deseja registrar alguma avaria?</p>
+                      <p className="text-gray-800 font-semibold">Nenhuma avaria adicionada</p>
+                      <p className="text-gray-400 text-sm mt-1">Adicione as avarias encontradas.</p>
                     </div>
                   ) : (
                     avarias.map((av, i) => (
@@ -589,36 +738,38 @@ export default function ChecklistPage() {
                           placeholder="Descrição da avaria..."
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 resize-none focus:outline-none focus:border-indigo-500"
                         />
+                        {/* Tipo da avaria */}
                         <select value={av.tipo} onChange={e => atualizarAvaria(i, 'tipo', e.target.value)}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:border-indigo-500">
-                          <option value="">Tipo da avaria...</option>
-                          <option value="mecanica">Mecânica</option>
-                          <option value="carroceria">Carroceria</option>
-                          <option value="eletrica">Elétrica</option>
-                          <option value="pneu">Pneu</option>
-                          <option value="outro">Outro</option>
+                          <option value="">Tipo da avaria *</option>
+                          {tiposAvaria.length > 0
+                            ? tiposAvaria.map(o => <option key={o.valor} value={o.valor}>{o.valor}</option>)
+                            : ['Mecânica','Carroceria','Elétrica','Pneu','Outro'].map(v => <option key={v} value={v}>{v}</option>)
+                          }
                         </select>
+                        {/* Gravidade */}
                         <select value={av.gravidade} onChange={e => atualizarAvaria(i, 'gravidade', e.target.value)}
                           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:border-indigo-500">
-                          <option value="">Gravidade...</option>
-                          <option value="leve">Leve</option>
-                          <option value="moderada">Moderada</option>
-                          <option value="grave">Grave</option>
-                          <option value="critica">Crítica</option>
+                          <option value="">Gravidade *</option>
+                          {gravidadesAvaria.length > 0
+                            ? gravidadesAvaria.map(o => <option key={o.valor} value={o.valor}>{o.valor}</option>)
+                            : ['Leve','Moderada','Grave','Crítica'].map(v => <option key={v} value={v}>{v}</option>)
+                          }
                         </select>
+                        {/* Foto obrigatória */}
                         <label className="flex items-center gap-3 cursor-pointer bg-gray-50 rounded-xl p-3 border border-gray-200">
                           <input type="file" accept="image/*" capture="environment" className="sr-only"
                             onChange={e => { const f = e.target.files?.[0]; if (f) atualizarAvaria(i, 'foto', f) }} />
                           {av.fotoPreview ? (
                             <img src={av.fotoPreview} alt="" className="w-14 h-14 rounded-xl object-cover" />
                           ) : (
-                            <div className="w-14 h-14 bg-gray-200 rounded-xl flex items-center justify-center">
-                              <Camera className="w-5 h-5 text-gray-400" />
+                            <div className="w-14 h-14 bg-red-50 rounded-xl flex items-center justify-center border-2 border-dashed border-red-200">
+                              <Camera className="w-5 h-5 text-red-400" />
                             </div>
                           )}
                           <div>
-                            <p className="text-gray-700 text-sm font-medium">Foto da avaria</p>
-                            <p className="text-gray-400 text-xs">{av.fotoPreview ? 'Toque para alterar' : 'Toque para fotografar'}</p>
+                            <p className="text-gray-700 text-sm font-medium">Foto da avaria *</p>
+                            <p className="text-gray-400 text-xs">{av.fotoPreview ? 'Toque para alterar' : 'Obrigatório — toque para fotografar'}</p>
                           </div>
                         </label>
                       </div>
@@ -631,8 +782,8 @@ export default function ChecklistPage() {
                 </>
               )}
 
-              {/* ── Etapa 5: Assinatura + CPF + Email ── */}
-              {etapa === 5 && (
+              {/* ── Etapa 6: Assinatura + CPF + Email ── */}
+              {etapa === 6 && (
                 <>
                   <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                     <SignatureCanvas onChange={setAssinatura} />
@@ -640,7 +791,7 @@ export default function ChecklistPage() {
 
                   <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-4">
                     <div>
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">CPF</label>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">CPF *</label>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -675,8 +826,8 @@ export default function ChecklistPage() {
               )}
             </div>
 
-            {/* Rodapé nav */}
-            {etapa < 5 && (
+            {/* Rodapé nav (etapas 1-5, não na 6 pois botão enviar está inline) */}
+            {etapa < 6 && (
               <div className="flex gap-3 px-5 pb-6 pt-2 bg-[#F4F6FB]">
                 <button onClick={tryVoltar}
                   className="flex-1 bg-white border border-gray-200 text-gray-700 rounded-2xl py-3.5 font-semibold text-sm flex items-center justify-center gap-1">
@@ -684,10 +835,14 @@ export default function ChecklistPage() {
                 </button>
                 <button
                   onClick={avancar}
-                  disabled={etapa === 2 && (!fotoFrente || !fotoTras)}
+                  disabled={
+                    (etapa === 2 && !tipoChecklist) ||
+                    (etapa === 4 && (!fotoFrente || !fotoTras)) ||
+                    (etapa === 5 && avariasSemFoto() && avarias.length > 0)
+                  }
                   className="flex-1 text-white rounded-2xl py-3.5 font-semibold text-sm flex items-center justify-center gap-1 disabled:opacity-40"
                   style={{ background: 'linear-gradient(135deg,#4B3FE4,#7C3AED)' }}>
-                  Avançar <ChevronRight className="w-4 h-4" />
+                  {etapa === 5 ? 'Continuar' : 'Avançar'} <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             )}
@@ -712,7 +867,7 @@ export default function ChecklistPage() {
             </div>
             <span className="font-bold text-gray-900">FleetFlow</span>
           </div>
-          <Bell className="w-5 h-5 text-gray-400" />
+          <Link href="/app/notificacoes"><Bell className="w-5 h-5 text-gray-400" /></Link>
         </div>
         <h1 className="text-2xl font-bold text-gray-900">Checklist Diário</h1>
         <p className="text-gray-500 text-sm mt-0.5">Realize a inspeção antes de iniciar a rota.</p>
@@ -723,6 +878,7 @@ export default function ChecklistPage() {
         <button
           onClick={iniciar}
           disabled={!ativo}
+          title={!ativo ? 'Nenhum veículo vinculado. Consulte seu gestor.' : undefined}
           className="w-full text-white font-bold rounded-2xl py-4 text-sm disabled:opacity-40 flex items-center justify-center gap-2"
           style={{ background: 'linear-gradient(135deg,#4B3FE4,#7C3AED)' }}>
           <ClipboardCheck className="w-5 h-5" />
@@ -746,16 +902,16 @@ export default function ChecklistPage() {
           ) : (
             <div className="space-y-2">
               {historico.map(ck => {
-                const badge = STATUS_BADGE[ck.status] ?? { label: ck.status, cls: 'bg-gray-100 text-gray-600' }
-                const dt    = ck.data_hora ? new Date(ck.data_hora) : null
+                const badge  = STATUS_BADGE[ck.status] ?? { label: ck.status, cls: 'bg-gray-100 text-gray-600' }
+                const dt     = ck.data_hora ? new Date(ck.data_hora) : null
                 const dataFmt = dt?.toLocaleDateString('pt-BR') ?? '—'
                 const horaFmt = dt?.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) ?? ''
                 return (
-                  <div key={ck.id} className="bg-white rounded-2xl px-5 py-4 shadow-sm border border-gray-100 flex items-center justify-between">
-                    <div>
+                  <div key={ck.id} className="bg-white rounded-2xl px-5 py-4 shadow-sm border border-gray-100 flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-indigo-400" />
-                        <p className="text-gray-900 font-semibold text-sm font-mono">{ck.id}</p>
+                        <FileText className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                        <p className="text-gray-900 font-semibold text-sm font-mono truncate">{ck.id}</p>
                       </div>
                       <p className="text-gray-400 text-xs mt-0.5">
                         {dataFmt} {horaFmt && `· ${horaFmt}`}
@@ -763,9 +919,21 @@ export default function ChecklistPage() {
                       </p>
                       <p className="text-gray-400 text-xs">{ck.tipo === 'pre' ? 'Pré-operação' : 'Pós-operação'}</p>
                     </div>
-                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${badge.cls}`}>
-                      {badge.label}
-                    </span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${badge.cls}`}>
+                        {badge.label}
+                      </span>
+                      {ck.pdf_url ? (
+                        <a href={ck.pdf_url} target="_blank" rel="noopener noreferrer"
+                           className="p-1.5 bg-indigo-50 rounded-lg" title="Abrir PDF">
+                          <ExternalLink className="w-3.5 h-3.5 text-indigo-600" />
+                        </a>
+                      ) : (
+                        <button disabled className="p-1.5 bg-gray-100 rounded-lg opacity-40 cursor-not-allowed" title="PDF não disponível">
+                          <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )
               })}

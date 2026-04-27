@@ -1,14 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useState } from 'react'
-import { Bell, Car, RefreshCw, FileText, History, Download, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react'
+import { Bell, Car, RefreshCw, FileText, History, Download, CheckCircle2, AlertTriangle, XCircle, ExternalLink } from 'lucide-react'
 import BottomNav from '../components/BottomNav'
 
 interface Veiculo {
   id: string; placa: string; marca: string; modelo: string
   ano_fabricacao: number; ano_modelo: number; tipo: string
   combustivel: string; cor: string; renavam: string; chassi: string
-  filial: string; km_atual: number; status: string
+  filial: string; km_atual: number; status: string; capacidade: string | null
 }
 
 interface Documento {
@@ -16,7 +16,8 @@ interface Documento {
 }
 
 interface Checklist {
-  id: string; id_real: string; data: string; status: string; km: string; tipo_checklist: string
+  id: string; id_real: string; data: string; status: string; km: string
+  tipo_checklist: string; pdf_url: string | null
 }
 
 const TIPO_LABEL: Record<string, string> = {
@@ -33,19 +34,18 @@ function docStatus(vencimento: string | null) {
 }
 
 function DocBadge({ status }: { status: string }) {
-  if (status === 'ok')       return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />OK</span>
-  if (status === 'alerta')   return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />Alerta</span>
-  if (status === 'vencido')  return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 flex items-center gap-1"><XCircle className="w-3 h-3" />Vencido</span>
-  return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">—</span>
+  if (status === 'ok')      return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />OK</span>
+  if (status === 'alerta')  return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />Alerta</span>
+  if (status === 'vencido') return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 flex items-center gap-1"><XCircle className="w-3 h-3" />Vencido</span>
+  return null
 }
 
 const STATUS_CHECKLIST: Record<string, string> = {
-  Aprovado: 'bg-green-100 text-green-700',
-  'Com Pendências': 'bg-yellow-100 text-yellow-700',
-  Validado: 'bg-emerald-100 text-emerald-700',
-  Recusado: 'bg-red-100 text-red-700',
-  Pendente: 'bg-gray-100 text-gray-600',
-  default: 'bg-gray-100 text-gray-600',
+  Aprovado:        'bg-green-100 text-green-700',
+  'Com Pendências':'bg-yellow-100 text-yellow-700',
+  Validado:        'bg-emerald-100 text-emerald-700',
+  Recusado:        'bg-red-100 text-red-700',
+  Pendente:        'bg-gray-100 text-gray-600',
 }
 
 export default function DadosAtivoPage() {
@@ -74,6 +74,7 @@ export default function DadosAtivoPage() {
         status:        String(c.status ?? 'Pendente'),
         km:            Number(c.km_atual ?? 0).toLocaleString('pt-BR'),
         tipo_checklist: String(c.tipo_checklist ?? 'Pré-operação'),
+        pdf_url:       (c.pdf_url as string | null) ?? null,
       })))
     } catch { /* offline */ } finally { setLoading(false); setRefreshing(false) }
   }, [])
@@ -151,15 +152,17 @@ export default function DadosAtivoPage() {
             <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-5 pt-4 pb-2">Identificação</p>
               {[
-                { label: 'Chassi',    value: veiculo.chassi      },
-                { label: 'Marca',     value: veiculo.marca       },
-                { label: 'Modelo',    value: veiculo.modelo      },
-                { label: 'Ano',       value: `${veiculo.ano_fabricacao ?? '—'}/${veiculo.ano_modelo ?? '—'}` },
-                { label: 'Cor',       value: veiculo.cor         },
-                { label: 'Tipo',      value: veiculo.tipo        },
-                { label: 'Combustível', value: veiculo.combustivel },
-                { label: 'RENAVAM',   value: veiculo.renavam     },
-                { label: 'Filial',    value: veiculo.filial      },
+                { label: 'Placa',          value: veiculo.placa          },
+                { label: 'Chassi',         value: veiculo.chassi         },
+                { label: 'RENAVAM',        value: veiculo.renavam        },
+                { label: 'Marca',          value: veiculo.marca          },
+                { label: 'Modelo',         value: veiculo.modelo         },
+                { label: 'Ano',            value: `${veiculo.ano_fabricacao ?? '—'}/${veiculo.ano_modelo ?? '—'}` },
+                { label: 'Cor',            value: veiculo.cor            },
+                { label: 'Tipo',           value: veiculo.tipo           },
+                { label: 'Combustível',    value: veiculo.combustivel    },
+                { label: 'Capacidade',     value: veiculo.capacidade     },
+                { label: 'Filial',         value: veiculo.filial         },
               ].map(row => (
                 <div key={row.label} className="flex items-center justify-between px-5 py-3 border-t border-gray-50">
                   <span className="text-gray-500 text-sm">{row.label}</span>
@@ -168,12 +171,11 @@ export default function DadosAtivoPage() {
               ))}
             </div>
 
-            {/* Telemetria */}
+            {/* KM */}
             <div className="rounded-2xl p-5 text-white"
                  style={{ background: 'linear-gradient(135deg,#4B3FE4,#7C3AED)' }}>
-              <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mb-1">Telemetria em Tempo Real</p>
+              <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mb-1">KM Atual</p>
               <p className="text-4xl font-bold">{veiculo.km_atual.toLocaleString('pt-BR')} km</p>
-              <p className="text-white/60 text-xs mt-1">KM Atual</p>
             </div>
           </>
         )}
@@ -184,6 +186,7 @@ export default function DadosAtivoPage() {
             {['CRLV','Seguro','Licenciamento'].map(tipo => {
               const doc = documentos.find(d => d.tipo === tipo)
               const st  = docStatus(doc?.vencimento ?? null)
+              const hasPdf = !!doc?.pdf_url
               return (
                 <div key={tipo} className="flex items-center justify-between px-5 py-4">
                   <div>
@@ -194,11 +197,19 @@ export default function DadosAtivoPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <DocBadge status={st} />
-                    {doc?.pdf_url && (
-                      <a href={doc.pdf_url} target="_blank" rel="noopener noreferrer"
-                         className="p-1.5 bg-indigo-50 rounded-lg">
-                        <Download className="w-3.5 h-3.5 text-indigo-600" />
-                      </a>
+                    {tipo === 'CRLV' && (
+                      hasPdf ? (
+                        <a href={doc!.pdf_url!} target="_blank" rel="noopener noreferrer"
+                           className="p-1.5 bg-indigo-50 rounded-lg" title="Baixar PDF">
+                          <Download className="w-3.5 h-3.5 text-indigo-600" />
+                        </a>
+                      ) : (
+                        <button disabled
+                          className="p-1.5 bg-gray-100 rounded-lg opacity-40 cursor-not-allowed"
+                          title="PDF do CRLV não disponível">
+                          <Download className="w-3.5 h-3.5 text-gray-400" />
+                        </button>
+                      )
                     )}
                   </div>
                 </div>
@@ -218,17 +229,31 @@ export default function DadosAtivoPage() {
             ) : (
               <div className="space-y-2">
                 {checklists.map(c => (
-                  <div key={c.id_real} className="bg-white rounded-2xl px-5 py-4 shadow-sm border border-gray-100 flex items-center justify-between">
-                    <div>
+                  <div key={c.id_real} className="bg-white rounded-2xl px-5 py-4 shadow-sm border border-gray-100 flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-indigo-400" />
-                        <p className="text-gray-900 font-semibold text-sm font-mono">{c.id}</p>
+                        <FileText className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                        <p className="text-gray-900 font-semibold text-sm font-mono truncate">{c.id}</p>
                       </div>
                       <p className="text-gray-400 text-xs mt-0.5">{c.data} · {c.tipo_checklist} · {c.km} km</p>
                     </div>
-                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${STATUS_CHECKLIST[c.status] ?? STATUS_CHECKLIST.default}`}>
-                      {c.status}
-                    </span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${STATUS_CHECKLIST[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {c.status}
+                      </span>
+                      {c.pdf_url ? (
+                        <a href={c.pdf_url} target="_blank" rel="noopener noreferrer"
+                           className="p-1.5 bg-indigo-50 rounded-lg" title="Abrir PDF">
+                          <ExternalLink className="w-3.5 h-3.5 text-indigo-600" />
+                        </a>
+                      ) : (
+                        <button disabled
+                          className="p-1.5 bg-gray-100 rounded-lg opacity-40 cursor-not-allowed"
+                          title="PDF não disponível">
+                          <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

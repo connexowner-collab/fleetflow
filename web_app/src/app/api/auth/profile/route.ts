@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   const supabase = createAdminClient()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, nome, email, perfil, avatar_url, created_at, tenant_id')
+    .select('id, nome, email, perfil, avatar_url, veiculo_id, placa_vinculada, filial, created_at, tenant_id, telas_permitidas, acesso')
     .eq('email', session.email)
     .single()
 

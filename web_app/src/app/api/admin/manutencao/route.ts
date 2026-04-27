@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { logAudit, getClientIp, AuditAcao } from '@/utils/audit'
+import { criarNotificacaoEPush } from '@/utils/push'
 import { cookies } from 'next/headers'
 
 async function getSession() {
@@ -135,6 +136,25 @@ export async function POST(request: Request) {
     ip: getClientIp(request),
   })
 
+  // NOTIF-03 — notificar motorista vinculado ao veículo
+  if (veiculo_id && tenant?.id) {
+    const { data: motorista } = await client
+      .from('profiles')
+      .select('id')
+      .eq('veiculo_id', veiculo_id)
+      .eq('perfil', 'motorista')
+      .maybeSingle()
+    if (motorista) {
+      criarNotificacaoEPush({
+        destinatarioId: motorista.id,
+        tenantId:       tenant.id,
+        tipo:           'manutencao_registrada',
+        titulo:         '🔧 Manutenção Registrada',
+        mensagem:       `Uma manutenção foi registrada para o veículo ${veiculo_placa}: ${descricao}`,
+      }).catch(console.error)
+    }
+  }
+
   return NextResponse.json({ manutencao: data })
 }
 
@@ -212,6 +232,25 @@ export async function PATCH(request: Request) {
       dados_depois: { status: novo_status, ...updates },
       ip: getClientIp(request),
     })
+  }
+
+  // NOTIF-04 — veículo entra em manutenção: avisar motorista vinculado
+  if (novo_status === 'em_manutencao' && atual.veiculo_id && atual.tenant_id) {
+    const { data: motorista } = await client
+      .from('profiles')
+      .select('id')
+      .eq('veiculo_id', atual.veiculo_id)
+      .eq('perfil', 'motorista')
+      .maybeSingle()
+    if (motorista) {
+      criarNotificacaoEPush({
+        destinatarioId: motorista.id,
+        tenantId:       atual.tenant_id,
+        tipo:           'veiculo_em_manutencao',
+        titulo:         '🚗 Veículo em Manutenção',
+        mensagem:       `O veículo ${atual.veiculo_placa} entrou em manutenção: ${atual.descricao}`,
+      }).catch(console.error)
+    }
   }
 
   return NextResponse.json({ ok: true })

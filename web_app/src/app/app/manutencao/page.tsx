@@ -78,13 +78,11 @@ function NovaManutencaoModal({
 
     setEnviando(true)
     try {
-      const fd = new FormData()
-      fd.append('veiculo_id', veiculoId)
-      fd.append('km', km)
-      fd.append('motivo', motivo)
-      fd.append('urgencia', urgencia)
-      fd.append('descricao', descricao)
-      const res = await fetch('/api/app/manutencao', { method: 'POST', body: fd })
+      const res = await fetch('/api/app/manutencao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ veiculo_id: veiculoId, km_atual: parseInt(km), motivo, urgencia, descricao }),
+      })
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
         setErros({ global: j.message ?? 'Erro ao enviar.' })

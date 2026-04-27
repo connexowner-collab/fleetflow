@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getSessionFromRequest, canManageFleet } from '@/utils/auth/session'
 import { logAudit, getIp } from '@/utils/audit/logAudit'
+import { criarNotificacaoEPush } from '@/utils/push'
 
 const roleMap: Record<string, string> = {
   'Motorista': 'motorista',
@@ -113,8 +114,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
 
-    // G6.3: Vehicle link changes
+    // G6.3 + NOTIF-05: Vehicle link changes
     if (veiculo_id !== undefined && veiculo_id !== current?.veiculo_id) {
+      // Fetch tenant_id for push notification
+      const { data: profile } = await supabase.from('profiles').select('tenant_id').eq('id', id).single()
+      if (veiculo_id && profile?.tenant_id) {
+        criarNotificacaoEPush({
+          destinatarioId: id,
+          tenantId:       profile.tenant_id,
+          tipo:           'veiculo_vinculado',
+          titulo:         '🚗 Veículo Vinculado',
+          mensagem:       `O veículo de placa ${placa ?? ''} foi vinculado à sua conta.`,
+        }).catch(console.error)
+      } else if (!veiculo_id && current?.veiculo_id && profile?.tenant_id) {
+        criarNotificacaoEPush({
+          destinatarioId: id,
+          tenantId:       profile.tenant_id,
+          tipo:           'veiculo_desvinculado',
+          titulo:         '🚗 Veículo Desvinculado',
+          mensagem:       `O veículo ${current.placa_vinculada ?? ''} foi desvinculado da sua conta.`,
+        }).catch(console.error)
+      }
       if (veiculo_id) {
         logAudit({
           ator_email: session.email, ator_perfil: session.perfil,

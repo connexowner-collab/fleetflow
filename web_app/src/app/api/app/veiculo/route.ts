@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
   const { data: veiculo } = await supabase
     .from('veiculos')
-    .select('id, placa, marca, modelo, ano_fabricacao, ano_modelo, tipo, combustivel, cor, renavam, chassi, filial, km_atual, status, deleted_at')
+    .select('id, placa, marca, modelo, ano_fabricacao, ano_modelo, tipo, combustivel, cor, renavam, chassi, filial, km_atual, status, capacidade, deleted_at')
     .eq('placa', profile.placa_vinculada)
     .eq('tenant_id', profile.tenant_id)
     .is('deleted_at', null)
