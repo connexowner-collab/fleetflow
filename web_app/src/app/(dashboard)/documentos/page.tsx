@@ -52,27 +52,33 @@ export default function DocumentosPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const supabase = createClient();
-    const { data: docs } = await supabase
-      .from('veiculo_documentos')
-      .select('id, veiculo_id, tipo, numero, data_vencimento, observacao')
-      .order('tipo');
+    try {
+      const supabase = createClient();
+      
+      // Busca documentos
+      const { data: docs } = await supabase
+        .from('veiculo_documentos')
+        .select('id, veiculo_id, tipo, numero, data_vencimento, observacao')
+        .order('tipo');
 
-    const { data: veics } = await supabase
-      .from('veiculos')
-      .select('id, placa, modelo')
-      .order('placa');
+      // Busca veículos via API para garantir sincronização e bypass de RLS se necessário
+      const res = await fetch('/api/admin/frota');
+      const { veiculos: veics } = await res.json();
 
-    const veiculosData = veics ?? [];
-    setVeiculos(veiculosData);
+      const veiculosData = veics ?? [];
+      setVeiculos(veiculosData);
 
-    const enriched = (docs ?? []).map(d => {
-      const v = veiculosData.find(x => x.id === d.veiculo_id);
-      return { ...d, veiculo_placa: v?.placa ?? '—', status: getStatus(d.data_vencimento) };
-    });
+      const enriched = (docs ?? []).map(d => {
+        const v = veiculosData.find((x: Veiculo) => x.id === d.veiculo_id);
+        return { ...d, veiculo_placa: v?.placa ?? '—', status: getStatus(d.data_vencimento) };
+      });
 
-    setDocumentos(enriched);
-    setLoading(false);
+      setDocumentos(enriched);
+    } catch (err) {
+      console.error('Erro ao carregar documentos/veículos:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -96,32 +102,38 @@ export default function DocumentosPage() {
 
   async function salvar() {
     setSalvando(true);
-    if (editando) {
-      await fetch('/api/admin/frota/documentos', {
-        method: 'PATCH',
+    try {
+      const res = await fetch('/api/admin/frota/documentos', {
+        method: editando ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: editando.id, numero: form.numero, data_vencimento: form.data_vencimento, observacao: form.observacao }),
+        body: JSON.stringify(editando 
+          ? { id: editando.id, numero: form.numero, data_vencimento: form.data_vencimento, observacao: form.observacao }
+          : form
+        ),
       });
-    } else {
-      const supabase = createClient();
-      await supabase.from('veiculo_documentos').insert({
-        veiculo_id: form.veiculo_id,
-        tipo: form.tipo,
-        numero: form.numero || null,
-        data_vencimento: form.data_vencimento || null,
-        observacao: form.observacao || null,
-      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      
+      setShowForm(false);
+      load();
+    } catch (err) {
+      console.error('Erro ao salvar documento:', err);
+      alert('Erro ao salvar documento. Verifique os dados e tente novamente.');
+    } finally {
+      setSalvando(false);
     }
-    setSalvando(false);
-    setShowForm(false);
-    load();
   }
 
   async function excluir(id: string) {
     if (!confirm('Excluir este documento?')) return;
-    const supabase = createClient();
-    await supabase.from('veiculo_documentos').delete().eq('id', id);
-    load();
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from('veiculo_documentos').delete().eq('id', id);
+      if (error) throw error;
+      load();
+    } catch (err) {
+      console.error('Erro ao excluir documento:', err);
+    }
   }
 
   return (

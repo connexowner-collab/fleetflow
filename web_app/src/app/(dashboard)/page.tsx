@@ -1,10 +1,17 @@
 "use client";
 
-import { AlertTriangle, Tag, Eye, Truck, Wrench, X, CheckCircle } from 'lucide-react';
+import { AlertTriangle, Tag, Eye, Truck, Wrench, X, CheckCircle, ChevronRight, Plus } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import Link from 'next/link';
 
 type Occurrence = { placa: string; motorista: string; gravidade: string; data: string; badgeClass: string; status: string; id: string }
+
+const GRAV_STYLE: Record<string, { pill: string; dot: string }> = {
+  Grave: { pill: 'bg-red-100 text-red-700',    dot: 'bg-red-500'    },
+  Média: { pill: 'bg-amber-100 text-amber-700', dot: 'bg-amber-400'  },
+  Leve:  { pill: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
+};
 
 export default function Dashboard() {
   const [toast, setToast] = useState<string | null>(null);
@@ -16,17 +23,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     const supabase = createClient();
-
     async function load() {
       const [metricsRes, ocRes] = await Promise.all([
         fetch('/api/dashboard').then((r) => r.json()),
-        supabase
-          .from('ocorrencias')
-          .select('id, codigo, placa, motorista_nome, gravidade, status, created_at')
-          .order('created_at', { ascending: false })
-          .limit(6),
+        supabase.from('ocorrencias').select('id, codigo, placa, motorista_nome, gravidade, status, created_at').order('created_at', { ascending: false }).limit(6),
       ]);
-
       setMetrics({
         totalVeiculos: metricsRes.totalVeiculos ?? 0,
         emManutencao: metricsRes.emManutencao ?? 0,
@@ -34,235 +35,242 @@ export default function Dashboard() {
         gravesNaoTratadas: metricsRes.gravesNaoTratadas ?? 0,
         trocasPendentes: metricsRes.trocasPendentes ?? 0,
       });
-
       const gravBadge: Record<string, string> = { Grave: 'bg-red-100 text-red-700', Média: 'bg-yellow-100 text-yellow-700', Leve: 'bg-green-100 text-green-700' };
       setRecentOccurrences(
         (ocRes.data ?? []).map((o) => ({
-          id: o.codigo ?? o.id,
-          placa: o.placa ?? '',
-          motorista: o.motorista_nome ?? '',
-          gravidade: o.gravidade,
-          data: new Date(o.created_at).toLocaleDateString('pt-BR'),
-          badgeClass: gravBadge[o.gravidade] ?? 'bg-gray-100 text-gray-700',
-          status: o.status,
+          id: o.codigo ?? o.id, placa: o.placa ?? '', motorista: o.motorista_nome ?? '',
+          gravidade: o.gravidade, data: new Date(o.created_at).toLocaleDateString('pt-BR'),
+          badgeClass: gravBadge[o.gravidade] ?? 'bg-gray-100 text-gray-700', status: o.status,
         }))
       );
     }
-
     load();
   }, []);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3500);
-  };
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
 
   const handleNovoVeiculo = async () => {
-    if (!newPlaca || !newModelo) {
-      showToast('⚠️ Placa e Modelo são obrigatórios.');
-      return;
-    }
+    if (!newPlaca || !newModelo) { showToast('⚠️ Placa e Modelo são obrigatórios.'); return; }
     const supabase = createClient();
     const { error } = await supabase.from('veiculos').insert({ placa: newPlaca.toUpperCase(), modelo: newModelo, status: 'Disponível' });
-    setIsNewVehicleOpen(false);
-    setNewPlaca('');
-    setNewModelo('');
-    if (error) {
-      showToast(`⚠️ Erro ao cadastrar: ${error.message}`);
-    } else {
-      showToast(`✅ Veículo ${newPlaca.toUpperCase()} adicionado! Confira em Gestão da Frota.`);
-    }
+    setIsNewVehicleOpen(false); setNewPlaca(''); setNewModelo('');
+    if (error) showToast(`⚠️ Erro ao cadastrar: ${error.message}`);
+    else showToast(`✅ Veículo ${newPlaca.toUpperCase()} adicionado!`);
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="max-w-5xl mx-auto space-y-6 pb-4">
+
       {/* Toast */}
       {toast && (
-        <div className="fixed top-6 right-6 z-50 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-medium animate-in slide-in-from-right">
+        <div className="fixed top-20 right-4 z-50 bg-gray-900 text-white px-4 py-3 rounded-2xl shadow-2xl text-sm font-medium animate-in slide-in-from-right flex items-center gap-2">
           {toast}
         </div>
       )}
 
-      {/* Modal rápido novo veículo */}
+      {/* Modal novo veículo */}
       {isNewVehicleOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={() => setIsNewVehicleOpen(false)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
-            <button onClick={() => setIsNewVehicleOpen(false)} className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100">
-              <X className="w-5 h-5 text-gray-500" />
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setIsNewVehicleOpen(false)} />
+          <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 sm:p-8 animate-in slide-in-from-bottom duration-300">
+            {/* Handle bar mobile */}
+            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-6 sm:hidden" />
+            <button onClick={() => setIsNewVehicleOpen(false)} className="absolute top-5 right-5 p-2 rounded-xl hover:bg-gray-100 transition-colors">
+              <X className="w-5 h-5 text-gray-400" />
             </button>
-            <h2 className="text-xl font-black text-gray-900 mb-1">Novo Veículo</h2>
-            <p className="text-gray-500 text-sm mb-6">Cadastro rápido. Acesse Gestão da Frota para mais detalhes.</p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Placa <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  value={newPlaca}
-                  onChange={(e) => setNewPlaca(e.target.value)}
-                  placeholder="ex: MNO-3456"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary uppercase"
-                />
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-brand-primary/10 rounded-2xl flex items-center justify-center">
+                <Truck className="w-5 h-5 text-brand-primary" />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Modelo <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  value={newModelo}
-                  onChange={(e) => setNewModelo(e.target.value)}
-                  placeholder="ex: Volvo FH 460"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
-                />
+                <h2 className="text-lg font-bold text-gray-900">Novo Veículo</h2>
+                <p className="text-xs text-gray-400">Cadastro rápido da frota</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Placa <span className="text-red-500">*</span></label>
+                <input type="text" value={newPlaca} onChange={(e) => setNewPlaca(e.target.value)} placeholder="ex: MNO-3456"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary uppercase transition-all" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Modelo <span className="text-red-500">*</span></label>
+                <input type="text" value={newModelo} onChange={(e) => setNewModelo(e.target.value)} placeholder="ex: Volvo FH 460"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary transition-all" />
               </div>
             </div>
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setIsNewVehicleOpen(false)} className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-bold text-gray-700 hover:bg-gray-50">
+              <button onClick={() => setIsNewVehicleOpen(false)} className="flex-1 py-3 rounded-2xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
                 Cancelar
               </button>
-              <button onClick={handleNovoVeiculo} className="flex-1 py-3 rounded-xl bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary/90 flex items-center justify-center">
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Cadastrar
+              <button onClick={handleNovoVeiculo} className="flex-1 py-3 rounded-2xl bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary/90 flex items-center justify-center gap-2 transition-colors shadow-lg shadow-brand-primary/20">
+                <CheckCircle className="w-4 h-4" /> Cadastrar
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">Visão Geral da Frota</h1>
-          <p className="text-gray-500 mt-1 text-sm md:text-base">Acompanhe as métricas essenciais da sua operação em tempo real.</p>
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Visão Geral</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Operação em tempo real</p>
         </div>
-        <button
-          onClick={() => setIsNewVehicleOpen(true)}
-          className="bg-brand-primary hover:bg-brand-primary-hover text-white px-6 py-2.5 rounded-lg font-medium shadow-sm transition-all focus:ring-4 focus:ring-brand-primary/20 flex items-center justify-center shadow-brand-primary/30 cursor-pointer shrink-0"
-        >
-          <Truck className="w-4 h-4 mr-2" />
-          Novo Veículo
+        <button onClick={() => setIsNewVehicleOpen(true)}
+          className="flex items-center gap-2 bg-brand-primary text-white text-sm font-bold px-4 py-2.5 rounded-2xl shadow-lg shadow-brand-primary/25 hover:bg-brand-primary/90 active:scale-95 transition-all">
+          <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo Veículo</span>
         </button>
       </div>
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start justify-between group hover:shadow-md transition-shadow">
-          <div>
-            <p className="text-sm font-medium text-gray-500 mb-1">Total de Veículos</p>
-            <h3 className="text-3xl font-bold text-gray-900">{metrics.totalVeiculos}</h3>
-            <p className="text-xs text-gray-500 mt-2 font-medium">na frota ativa</p>
+      {/* Bento Metric Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+
+        {/* Total Veículos — Destaque */}
+        <div className="col-span-2 lg:col-span-1 relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-brand-primary to-blue-700 text-white shadow-lg shadow-brand-primary/20">
+          <div className="absolute -right-4 -bottom-4 opacity-10">
+            <Truck className="w-24 h-24" />
           </div>
-          <div className="p-3 bg-brand-primary/10 rounded-xl text-brand-primary group-hover:scale-110 transition-transform">
-            <Truck className="w-6 h-6" />
-          </div>
+          <p className="text-xs font-bold uppercase tracking-widest opacity-75 mb-2">Total de Veículos</p>
+          <p className="text-5xl font-black leading-none mb-1">{metrics.totalVeiculos}</p>
+          <p className="text-xs opacity-70 font-medium">na frota ativa</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start justify-between group hover:shadow-md transition-shadow">
-          <div>
-            <p className="text-sm font-medium text-gray-500 mb-1">Ocorrências Ativas</p>
-            <h3 className="text-3xl font-bold text-gray-900">{metrics.ocorrenciasAtivas}</h3>
-            <p className="text-xs text-red-600 mt-2 font-medium">{metrics.gravesNaoTratadas} graves não tratadas</p>
+        {/* Ocorrências Ativas */}
+        <div className={`relative overflow-hidden rounded-2xl p-5 border transition-all ${metrics.ocorrenciasAtivas > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
+          <div className="absolute -right-3 -bottom-3 opacity-10">
+            <AlertTriangle className={`w-16 h-16 ${metrics.ocorrenciasAtivas > 0 ? 'text-red-600' : 'text-gray-400'}`} />
           </div>
-          <div className="p-3 bg-red-100 rounded-xl text-red-600 group-hover:scale-110 transition-transform">
-            <AlertTriangle className="w-6 h-6" />
-          </div>
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Ocorrências</p>
+          <p className={`text-4xl font-black leading-none mb-1 ${metrics.ocorrenciasAtivas > 0 ? 'text-red-600' : 'text-gray-900'}`}>{metrics.ocorrenciasAtivas}</p>
+          <p className={`text-xs font-semibold ${metrics.gravesNaoTratadas > 0 ? 'text-red-500' : 'text-gray-400'}`}>{metrics.gravesNaoTratadas} graves</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start justify-between group hover:shadow-md transition-shadow">
-          <div>
-            <p className="text-sm font-medium text-gray-500 mb-1">Aguardando Avaliação</p>
-            <h3 className="text-3xl font-bold text-gray-900">{metrics.trocasPendentes}</h3>
-            <p className="text-xs text-yellow-600 mt-2 font-medium">Trocas pendentes</p>
+        {/* Trocas Pendentes */}
+        <div className={`relative overflow-hidden rounded-2xl p-5 border transition-all ${metrics.trocasPendentes > 0 ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-100'}`}>
+          <div className="absolute -right-3 -bottom-3 opacity-10">
+            <Tag className={`w-16 h-16 ${metrics.trocasPendentes > 0 ? 'text-amber-500' : 'text-gray-400'}`} />
           </div>
-          <div className="p-3 bg-yellow-100 rounded-xl text-yellow-600 group-hover:scale-110 transition-transform">
-            <Tag className="w-6 h-6" />
-          </div>
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Aprovações</p>
+          <p className={`text-4xl font-black leading-none mb-1 ${metrics.trocasPendentes > 0 ? 'text-amber-600' : 'text-gray-900'}`}>{metrics.trocasPendentes}</p>
+          <p className="text-xs text-gray-400 font-medium">trocas pendentes</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start justify-between group hover:shadow-md transition-shadow">
-          <div>
-            <p className="text-sm font-medium text-gray-500 mb-1">Em Manutenção</p>
-            <h3 className="text-3xl font-bold text-gray-900">{metrics.emManutencao}</h3>
-            <p className="text-xs text-gray-500 mt-2 font-medium">Nas oficinas credenciadas</p>
+        {/* Em Manutenção */}
+        <div className={`relative overflow-hidden rounded-2xl p-5 border transition-all ${metrics.emManutencao > 0 ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-100'}`}>
+          <div className="absolute -right-3 -bottom-3 opacity-10">
+            <Wrench className={`w-16 h-16 ${metrics.emManutencao > 0 ? 'text-blue-600' : 'text-gray-400'}`} />
           </div>
-          <div className="p-3 bg-blue-100 rounded-xl text-blue-600 group-hover:scale-110 transition-transform">
-            <Wrench className="w-6 h-6" />
-          </div>
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Manutenção</p>
+          <p className={`text-4xl font-black leading-none mb-1 ${metrics.emManutencao > 0 ? 'text-blue-600' : 'text-gray-900'}`}>{metrics.emManutencao}</p>
+          <p className="text-xs text-gray-400 font-medium">em oficina</p>
         </div>
       </div>
 
-      {/* Sub Grids */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Recent Occurrences Table */}
-        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-gray-900">Últimas Ocorrências Relatadas</h2>
-            <a href="/ocorrencias" className="text-sm text-brand-primary font-medium hover:underline cursor-pointer">Ver todas</a>
+      {/* Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        {/* Últimas Ocorrências */}
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
+            <h2 className="font-bold text-gray-900">Últimas Ocorrências</h2>
+            <Link href="/ocorrencias" className="text-xs font-bold text-brand-primary flex items-center gap-1 hover:gap-2 transition-all">
+              Ver todas <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50/50 text-gray-500 text-sm">
-                  <th className="px-6 py-4 font-medium">Placa</th>
-                  <th className="px-6 py-4 font-medium">Motorista</th>
-                  <th className="px-6 py-4 font-medium">Gravidade</th>
-                  <th className="px-6 py-4 font-medium">Data</th>
-                  <th className="px-6 py-4 font-medium text-right">Ação</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {recentOccurrences.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50/50 transition-colors group">
-                    <td className="px-6 py-4 font-bold text-gray-800">{item.placa}</td>
-                    <td className="px-6 py-4 text-gray-600">{item.motorista}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 text-xs font-bold rounded-full ${item.badgeClass}`}>
-                        {item.gravidade}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-500 text-sm">{item.data}</td>
-                    <td className="px-6 py-4 text-right">
-                      <a href="/ocorrencias" className="text-gray-400 hover:text-brand-primary p-2 rounded-lg hover:bg-brand-primary/10 transition-colors inline-flex">
-                        <Eye className="w-4 h-4" />
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+
+          {recentOccurrences.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+              <CheckCircle className="w-10 h-10 mb-3 opacity-30" />
+              <p className="text-sm font-medium">Sem ocorrências recentes</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {recentOccurrences.map((item, idx) => {
+                const style = GRAV_STYLE[item.gravidade] ?? { pill: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400' };
+                return (
+                  <Link href="/ocorrencias" key={idx}
+                    className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50/80 transition-colors group">
+                    {/* Severity dot */}
+                    <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${style.dot}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-gray-800">{item.placa}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${style.pill}`}>{item.gravidade}</span>
+                      </div>
+                      <p className="text-xs text-gray-400 truncate mt-0.5">{item.motorista}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs text-gray-400">{item.data}</p>
+                      <Eye className="w-4 h-4 text-gray-300 group-hover:text-brand-primary mt-1 ml-auto transition-colors" />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Action Center */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-6">Central de Tarefas</h2>
-          <div className="space-y-4">
+        {/* Central de Tarefas */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h2 className="font-bold text-gray-900 mb-4">Tarefas Pendentes</h2>
+          <div className="space-y-3">
             {metrics.gravesNaoTratadas > 0 && (
-              <a href="/ocorrencias" className="block p-4 border border-red-200 bg-red-50 rounded-xl relative overflow-hidden hover:bg-red-100 transition-colors">
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500"></div>
-                <h4 className="font-bold text-red-900 text-sm mb-1">Ocorrências Graves sem Tratativa</h4>
-                <p className="text-xs text-red-700">{metrics.gravesNaoTratadas} {metrics.gravesNaoTratadas === 1 ? 'ocorrência grave aguarda' : 'ocorrências graves aguardam'} encaminhamento.</p>
-              </a>
+              <Link href="/ocorrencias" className="flex items-start gap-3 p-3.5 bg-red-50 border border-red-100 rounded-xl hover:bg-red-100 transition-colors group">
+                <div className="w-8 h-8 bg-red-100 group-hover:bg-red-200 rounded-xl flex items-center justify-center shrink-0 transition-colors">
+                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-red-900 leading-tight">Ocorrências Graves</p>
+                  <p className="text-xs text-red-600 mt-0.5">{metrics.gravesNaoTratadas} sem tratativa</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-red-400 mt-0.5 ml-auto shrink-0" />
+              </Link>
             )}
 
             {metrics.trocasPendentes > 0 && (
-              <a href="/admin/trocas" className="block p-4 border border-yellow-200 bg-yellow-50 rounded-xl relative overflow-hidden hover:bg-yellow-100 transition-colors">
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-yellow-400"></div>
-                <h4 className="font-bold text-yellow-900 text-sm mb-1">Aprovações de Troca Pendentes</h4>
-                <p className="text-xs text-yellow-800">{metrics.trocasPendentes} {metrics.trocasPendentes === 1 ? 'solicitação aguarda' : 'solicitações aguardam'} sua aprovação.</p>
-              </a>
+              <Link href="/admin/trocas" className="flex items-start gap-3 p-3.5 bg-amber-50 border border-amber-100 rounded-xl hover:bg-amber-100 transition-colors group">
+                <div className="w-8 h-8 bg-amber-100 group-hover:bg-amber-200 rounded-xl flex items-center justify-center shrink-0 transition-colors">
+                  <Tag className="w-4 h-4 text-amber-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-amber-900 leading-tight">Trocas para Aprovar</p>
+                  <p className="text-xs text-amber-600 mt-0.5">{metrics.trocasPendentes} aguardando</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-amber-400 mt-0.5 ml-auto shrink-0" />
+              </Link>
             )}
 
             {metrics.emManutencao > 0 && (
-              <a href="/frota" className="block p-4 border border-blue-200 bg-blue-50 rounded-xl relative overflow-hidden hover:bg-blue-100 transition-colors">
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-400"></div>
-                <h4 className="font-bold text-blue-900 text-sm mb-1">Veículos em Manutenção</h4>
-                <p className="text-xs text-blue-700">{metrics.emManutencao} {metrics.emManutencao === 1 ? 'veículo está' : 'veículos estão'} nas oficinas credenciadas.</p>
-              </a>
+              <Link href="/frota" className="flex items-start gap-3 p-3.5 bg-blue-50 border border-blue-100 rounded-xl hover:bg-blue-100 transition-colors group">
+                <div className="w-8 h-8 bg-blue-100 group-hover:bg-blue-200 rounded-xl flex items-center justify-center shrink-0 transition-colors">
+                  <Wrench className="w-4 h-4 text-blue-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-blue-900 leading-tight">Em Manutenção</p>
+                  <p className="text-xs text-blue-600 mt-0.5">{metrics.emManutencao} veículo(s)</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-blue-400 mt-0.5 ml-auto shrink-0" />
+              </Link>
             )}
 
-            <a href="/checklists" className="block p-4 border border-gray-100 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-              <h4 className="font-bold text-gray-800 text-sm mb-1">Central de Inspeções Diárias</h4>
-              <p className="text-xs text-gray-500">Valide e libere os checklists recebidos pelo aplicativo.</p>
-            </a>
+            <Link href="/checklists" className="flex items-start gap-3 p-3.5 bg-gray-50 border border-gray-100 rounded-xl hover:bg-gray-100 transition-colors group">
+              <div className="w-8 h-8 bg-gray-100 group-hover:bg-gray-200 rounded-xl flex items-center justify-center shrink-0 transition-colors">
+                <CheckCircle className="w-4 h-4 text-gray-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-gray-800 leading-tight">Inspeções Diárias</p>
+                <p className="text-xs text-gray-400 mt-0.5">Validar checklists</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-gray-300 mt-0.5 ml-auto shrink-0" />
+            </Link>
+
+            {metrics.gravesNaoTratadas === 0 && metrics.trocasPendentes === 0 && metrics.emManutencao === 0 && (
+              <div className="flex flex-col items-center py-6 text-gray-300">
+                <CheckCircle className="w-8 h-8 mb-2" />
+                <p className="text-xs font-medium text-gray-400">Tudo em dia!</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
