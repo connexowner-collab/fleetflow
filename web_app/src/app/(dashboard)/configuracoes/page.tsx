@@ -411,12 +411,18 @@ export default function ConfiguracoesPage() {
                     <span className={`text-sm font-medium ${isAtivo ? 'text-gray-900' : 'text-gray-400'}`}>
                       {label}
                     </span>
-                    <button
-                      onClick={() => handleToggleAtivo(dbMenu?.id || null, 'menu', isAtivo, label)}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isAtivo ? 'bg-brand-primary' : 'bg-gray-200'}`}
-                    >
-                      <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${isAtivo ? 'translate-x-5' : 'translate-x-1'}`} />
-                    </button>
+                    {label !== 'Configurações' ? (
+                      <button
+                        onClick={() => handleToggleAtivo(dbMenu?.id || null, 'menu', isAtivo, label)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isAtivo ? 'bg-brand-primary' : 'bg-gray-200'}`}
+                      >
+                        <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${isAtivo ? 'translate-x-5' : 'translate-x-1'}`} />
+                      </button>
+                    ) : (
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-100 px-2 py-1 rounded-md">
+                        Obrigatório
+                      </span>
+                    )}
                   </div>
                 );
               })}
