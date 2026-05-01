@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from 'react'
-import { Bell, Car, RefreshCw, FileText, History, Download, CheckCircle2, AlertTriangle, XCircle, ExternalLink } from 'lucide-react'
+import { Bell, Car, RefreshCw, FileText, History, Download, CheckCircle2, AlertTriangle, XCircle, ExternalLink, Eye, X } from 'lucide-react'
 import BottomNav from '../components/BottomNav'
 
 interface Veiculo {
@@ -55,6 +55,7 @@ export default function DadosAtivoPage() {
   const [loading,    setLoading]    = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [aba,        setAba]        = useState<'dados'|'docs'|'historico'>('dados')
+  const [selectedDoc, setSelectedDoc] = useState<Documento | null>(null)
 
   const load = useCallback(async (manual = false) => {
     if (manual) setRefreshing(true)
@@ -202,10 +203,10 @@ export default function DadosAtivoPage() {
                     <div className="flex items-center gap-3">
                       <DocBadge status={st} />
                       {hasAnexo ? (
-                        <a href={doc.url_anexo!} target="_blank" rel="noopener noreferrer"
+                        <button onClick={() => setSelectedDoc(doc)}
                            className="p-2 bg-indigo-50 rounded-xl" title="Ver anexo">
-                          <ExternalLink className="w-4 h-4 text-indigo-600" />
-                        </a>
+                          <Eye className="w-4 h-4 text-indigo-600" />
+                        </button>
                       ) : (
                         <div className="w-8 h-8 flex items-center justify-center opacity-20">
                            <FileText className="w-4 h-4 text-gray-400" />
@@ -264,6 +265,43 @@ export default function DadosAtivoPage() {
       </div>
 
       <BottomNav />
+
+      {/* Modal de Visualização de Anexo */}
+      {selectedDoc && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setSelectedDoc(null)} />
+          <div className="relative bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-600" />
+                <span className="font-bold text-gray-900 text-sm truncate">{selectedDoc.tipo}</span>
+              </div>
+              <button onClick={() => setSelectedDoc(null)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-auto bg-gray-50 flex items-center justify-center min-h-[300px]">
+              {selectedDoc.url_anexo?.toLowerCase().endsWith('.pdf') ? (
+                <iframe src={selectedDoc.url_anexo} className="w-full h-full min-h-[500px]" />
+              ) : (
+                <img src={selectedDoc.url_anexo || ''} alt={selectedDoc.tipo} className="max-w-full max-h-full object-contain" />
+              )}
+            </div>
+
+            <div className="p-4 bg-white border-t border-gray-100 flex gap-3">
+              <button onClick={() => setSelectedDoc(null)}
+                className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-50 rounded-2xl transition-all">
+                Fechar
+              </button>
+              <a href={selectedDoc.url_anexo || ''} download target="_blank" rel="noopener noreferrer"
+                className="flex-1 py-3 bg-indigo-600 text-white text-sm font-bold rounded-2xl shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 hover:bg-indigo-700 active:scale-95 transition-all">
+                <Download className="w-4 h-4" /> Baixar
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
