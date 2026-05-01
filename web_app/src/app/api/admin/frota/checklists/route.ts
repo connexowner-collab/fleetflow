@@ -15,7 +15,7 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from('checklists')
-    .select('id, codigo, motorista_nome, status, created_at, placa, km_atual')
+    .select('id, codigo, motorista_nome, status, created_at, placa, km_atual, tipo_checklist')
     .order('created_at', { ascending: false })
     .limit(50)
 

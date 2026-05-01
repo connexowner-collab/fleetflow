@@ -9,6 +9,8 @@ import {
 type ChecklistItem = { nome: string; conforme: boolean };
 type ChecklistFoto = { tipo: string; url: string };
 
+type ValidarModal = { inspection: Inspection; obs: string; submitting: boolean } | null;
+
 type Inspection = {
   id: string; id_real: string; motorista: string; placa: string;
   data: string; status: string; km: string; tem_avaria: boolean;
@@ -35,6 +37,7 @@ export default function ChecklistsPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('Todos');
+  const [validarModal, setValidarModal] = useState<ValidarModal>(null);
 
   const fetchInspections = async () => {
     try {
@@ -84,15 +87,25 @@ export default function ChecklistsPage() {
     return res.json();
   }
 
-  const handleValidar = async (inspection: Inspection) => {
-    const obs = prompt('Observação de validação (obrigatória):');
-    if (!obs?.trim()) return;
+  const handleValidar = (inspection: Inspection) => {
+    setValidarModal({ inspection, obs: '', submitting: false });
+  };
+
+  const submitValidar = async () => {
+    if (!validarModal) return;
+    const { inspection, obs } = validarModal;
+    if (!obs.trim()) return;
+    setValidarModal(m => m ? { ...m, submitting: true } : null);
     try {
       await patchChecklist(inspection.id_real, 'Validado', obs.trim());
       setInspections(prev => prev.map(i => i.id_real === inspection.id_real ? { ...i, status: 'Validado' } : i));
       setSelectedInspection(null);
+      setValidarModal(null);
       showToast(`✅ Checklist ${inspection.id} validado!`);
-    } catch { showToast('⚠️ Erro ao validar.'); }
+    } catch {
+      setValidarModal(m => m ? { ...m, submitting: false } : null);
+      showToast('⚠️ Erro ao validar.');
+    }
   };
 
   const handleAprovar = async (inspection: Inspection) => {
@@ -135,6 +148,49 @@ export default function ChecklistsPage() {
       {toast && (
         <div className="fixed top-20 right-4 z-50 bg-gray-900 text-white px-4 py-3 rounded-2xl shadow-2xl text-sm font-medium animate-in slide-in-from-right">
           {toast}
+        </div>
+      )}
+
+      {/* Modal — Validar com observação (CA-28) */}
+      {validarModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !validarModal.submitting && setValidarModal(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <div>
+              <h3 className="text-lg font-black text-gray-900">Validar Checklist</h3>
+              <p className="text-sm text-gray-500 mt-0.5">{validarModal.inspection.id} — {validarModal.inspection.placa}</p>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Observação de Validação <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                autoFocus
+                rows={3}
+                placeholder="Descreva as observações para validar e liberar este checklist..."
+                value={validarModal.obs}
+                onChange={e => setValidarModal(m => m ? { ...m, obs: e.target.value } : null)}
+                className="mt-1.5 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/20 resize-none"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setValidarModal(null)}
+                disabled={validarModal.submitting}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={submitValidar}
+                disabled={!validarModal.obs.trim() || validarModal.submitting}
+                className="flex-1 py-2.5 rounded-xl bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary/90 disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                {validarModal.submitting ? 'Validando...' : 'Validar e Liberar'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

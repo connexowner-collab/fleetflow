@@ -28,6 +28,7 @@ type ChecklistItem = {
   created_at: string
   placa: string
   km_atual: number | null
+  tipo_checklist: string | null
 }
 
 type Vehicle = {
@@ -86,10 +87,12 @@ const docBadge: Record<DocStatus, { label: string; cls: string }> = {
 }
 
 const ckStatusCls: Record<string, string> = {
-  'Aprovado':    'bg-green-100 text-green-700',
-  'Pendente':    'bg-yellow-100 text-yellow-700',
-  'Recusado':    'bg-red-100 text-red-700',
-  'Avaria Grave':'bg-red-100 text-red-800',
+  'Aprovado':       'bg-green-100 text-green-700',
+  'Validado':       'bg-emerald-100 text-emerald-800',
+  'Pendente':       'bg-blue-100 text-blue-700',
+  'Com Pendências': 'bg-amber-100 text-amber-700',
+  'Recusado':       'bg-red-100 text-red-700',
+  'Avaria Grave':   'bg-red-100 text-red-800',
 }
 
 // ── Validações ───────────────────────────────────────────
@@ -839,6 +842,9 @@ export default function FleetPage() {
                     <div key={ck.id} className="bg-gray-50 rounded-xl p-4 flex items-center justify-between">
                       <div>
                         <p className="text-sm font-black text-gray-900">{ck.codigo}</p>
+                        {ck.tipo_checklist && (
+                          <p className="text-xs font-semibold text-indigo-600">{ck.tipo_checklist}</p>
+                        )}
                         <p className="text-xs text-gray-500">{ck.motorista_nome}</p>
                         <p className="text-xs text-gray-400">{new Date(ck.created_at).toLocaleString('pt-BR')}</p>
                         {ck.km_atual && <p className="text-xs text-gray-400">{ck.km_atual.toLocaleString('pt-BR')} km</p>}
