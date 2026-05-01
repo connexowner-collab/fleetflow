@@ -12,7 +12,7 @@ interface Veiculo {
 }
 
 interface Documento {
-  tipo: string; vencimento: string | null; pdf_url: string | null; deleted_at: string | null
+  tipo: string; data_vencimento: string | null; url_anexo: string | null;
 }
 
 interface Checklist {
@@ -21,7 +21,7 @@ interface Checklist {
 }
 
 const TIPO_LABEL: Record<string, string> = {
-  CRLV: 'CRLV', Seguro: 'Seguro', Licenciamento: 'Licenciamento'
+  CRLV: 'CRLV', Seguro: 'Seguro', Licenciamento: 'Licenciamento', Tacógrafo: 'Tacógrafo', ANTT: 'ANTT', Outros: 'Outros'
 }
 
 function docStatus(vencimento: string | null) {
@@ -183,38 +183,39 @@ export default function DadosAtivoPage() {
         {/* Aba Documentação */}
         {aba === 'docs' && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 divide-y divide-gray-50">
-            {['CRLV','Seguro','Licenciamento'].map(tipo => {
-              const doc = documentos.find(d => d.tipo === tipo)
-              const st  = docStatus(doc?.vencimento ?? null)
-              const hasPdf = !!doc?.pdf_url
-              return (
-                <div key={tipo} className="flex items-center justify-between px-5 py-4">
-                  <div>
-                    <p className="text-gray-900 font-semibold text-sm">{TIPO_LABEL[tipo]}</p>
-                    <p className="text-gray-400 text-xs mt-0.5">
-                      {doc?.vencimento ? `Vence: ${new Date(doc.vencimento + 'T12:00').toLocaleDateString('pt-BR')}` : 'Sem data'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <DocBadge status={st} />
-                    {tipo === 'CRLV' && (
-                      hasPdf ? (
-                        <a href={doc!.pdf_url!} target="_blank" rel="noopener noreferrer"
-                           className="p-1.5 bg-indigo-50 rounded-lg" title="Baixar PDF">
-                          <Download className="w-3.5 h-3.5 text-indigo-600" />
+            {documentos.length === 0 ? (
+              <div className="p-8 text-center text-gray-400 text-sm">
+                Nenhum documento encontrado.
+              </div>
+            ) : (
+              documentos.map((doc, idx) => {
+                const st  = docStatus(doc.data_vencimento)
+                const hasAnexo = !!doc.url_anexo
+                return (
+                  <div key={idx} className="flex items-center justify-between px-5 py-4">
+                    <div className="flex-1 min-w-0 pr-4">
+                      <p className="text-gray-900 font-semibold text-sm truncate">{TIPO_LABEL[doc.tipo] || doc.tipo}</p>
+                      <p className="text-gray-400 text-xs mt-0.5">
+                        {doc.data_vencimento ? `Vence: ${new Date(doc.data_vencimento + 'T12:00').toLocaleDateString('pt-BR')}` : 'Sem data'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <DocBadge status={st} />
+                      {hasAnexo ? (
+                        <a href={doc.url_anexo!} target="_blank" rel="noopener noreferrer"
+                           className="p-2 bg-indigo-50 rounded-xl" title="Ver anexo">
+                          <ExternalLink className="w-4 h-4 text-indigo-600" />
                         </a>
                       ) : (
-                        <button disabled
-                          className="p-1.5 bg-gray-100 rounded-lg opacity-40 cursor-not-allowed"
-                          title="PDF do CRLV não disponível">
-                          <Download className="w-3.5 h-3.5 text-gray-400" />
-                        </button>
-                      )
-                    )}
+                        <div className="w-8 h-8 flex items-center justify-center opacity-20">
+                           <FileText className="w-4 h-4 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })
+            )}
           </div>
         )}
 

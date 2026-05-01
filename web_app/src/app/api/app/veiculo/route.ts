@@ -31,9 +31,8 @@ export async function GET(request: NextRequest) {
   // Documentos do veículo
   const { data: documentos } = await supabase
     .from('veiculo_documentos')
-    .select('tipo, vencimento, pdf_url, deleted_at')
+    .select('tipo, data_vencimento, url_anexo')
     .eq('veiculo_id', veiculo.id)
-    .is('deleted_at', null)
 
   return NextResponse.json({ veiculo, documentos: documentos ?? [] })
 }
