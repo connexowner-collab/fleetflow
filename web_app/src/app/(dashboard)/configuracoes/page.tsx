@@ -1,14 +1,18 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Settings, Building, Bell, Shield, Save, CheckCircle, ClipboardList, Plus, Trash2, MapPin, Briefcase, Grid3X3, Wrench } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { applyBrandColor } from '@/utils/brand';
 
+type Opcao = { id: string; valor: string; ativo: boolean };
+type Categoria = 'unidade' | 'setor' | 'area' | 'item_inspecao';
+
+/* ── API helpers ─────────────────────────────────────────────────────────── */
 async function fetchOpcoes() {
-  const res = await fetch('/api/admin/config')
-  const json = await res.json()
-  return (json.opcoes ?? []) as { id: string; categoria: string; valor: string; ativo: boolean }[]
+  const res = await fetch('/api/admin/config');
+  const json = await res.json();
+  return (json.opcoes ?? []) as { id: string; categoria: string; valor: string; ativo: boolean }[];
 }
 
 async function adicionarOpcaoAPI(categoria: string, valor: string) {
@@ -16,8 +20,8 @@ async function adicionarOpcaoAPI(categoria: string, valor: string) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ categoria, valor }),
-  })
-  return res.json()
+  });
+  return res.json();
 }
 
 async function removerOpcaoAPI(id: string) {
@@ -25,13 +29,79 @@ async function removerOpcaoAPI(id: string) {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id }),
-  })
-  return res.json()
+  });
+  return res.json();
 }
 
-type Opcao = { id: string; valor: string; ativo: boolean };
-type Categoria = 'unidade' | 'setor' | 'area' | 'item_inspecao';
+/* ── OpcaoManager — definido FORA do componente pai para não perder foco ── */
+interface OpcaoManagerProps {
+  cat: Categoria;
+  lista: Opcao[];
+  icon: React.ReactNode;
+  label: string;
+  loading: boolean;
+  inputValue: string;
+  onInputChange: (cat: Categoria, val: string) => void;
+  onAdicionar: (cat: Categoria) => void;
+  onRemover: (cat: Categoria, id: string, valor: string) => void;
+}
 
+function OpcaoManager({ cat, lista, icon, label, loading, inputValue, onInputChange, onAdicionar, onRemover }: OpcaoManagerProps) {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <div className="p-2.5 bg-brand-primary/10 rounded-xl text-brand-primary flex-shrink-0">{icon}</div>
+        <h3 className="text-base font-bold text-gray-900 flex-1">{label}</h3>
+        <span className="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full font-semibold whitespace-nowrap">
+          {lista.length} {lista.length === 1 ? 'opção' : 'opções'}
+        </span>
+      </div>
+
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={inputValue}
+          onChange={e => onInputChange(cat, e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && onAdicionar(cat)}
+          placeholder={`Nova opção...`}
+          className="flex-1 min-w-0 px-4 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
+        />
+        <button
+          onClick={() => onAdicionar(cat)}
+          disabled={!inputValue.trim()}
+          className="px-4 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primary/90 disabled:opacity-40 transition-all flex items-center gap-1.5 whitespace-nowrap"
+        >
+          <Plus className="w-4 h-4" /> Adicionar
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-6 text-gray-400 text-sm">Carregando...</div>
+      ) : lista.length === 0 ? (
+        <div className="text-center py-6 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-xl">
+          Nenhuma opção cadastrada
+        </div>
+      ) : (
+        <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+          {lista.map(op => (
+            <div key={op.id} className="flex items-center justify-between px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-100 group">
+              <span className="text-sm text-gray-800 font-medium truncate flex-1">{op.valor}</span>
+              <button
+                onClick={() => onRemover(cat, op.id, op.valor)}
+                className="ml-2 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                title="Remover"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Página principal ────────────────────────────────────────────────────── */
 export default function ConfiguracoesPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [empresa, setEmpresa] = useState('');
@@ -44,12 +114,13 @@ export default function ConfiguracoesPage() {
   const [sessaoTimeout, setSessaoTimeout] = useState('60');
   const [abaAtiva, setAbaAtiva] = useState<'empresa' | 'checklist'>('empresa');
 
-  // Dropdown options state
   const [unidades, setUnidades] = useState<Opcao[]>([]);
   const [setores, setSetores] = useState<Opcao[]>([]);
   const [areas, setAreas] = useState<Opcao[]>([]);
   const [itensInspecao, setItensInspecao] = useState<Opcao[]>([]);
-  const [novaOpcao, setNovaOpcao] = useState<Record<Categoria, string>>({ unidade: '', setor: '', area: '', item_inspecao: '' });
+  const [novaOpcao, setNovaOpcao] = useState<Record<Categoria, string>>({
+    unidade: '', setor: '', area: '', item_inspecao: '',
+  });
   const [loadingOpcoes, setLoadingOpcoes] = useState(true);
 
   const showToast = (msg: string) => {
@@ -57,12 +128,9 @@ export default function ConfiguracoesPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Load company data and dropdown options
   useEffect(() => {
     const supabase = createClient();
-
     async function load() {
-      // Load tenant info via Supabase client (apenas leitura de dados públicos do tenant)
       const { data: tenant } = await supabase.from('tenants').select('*').single();
       if (tenant) {
         setEmpresa(tenant.nome ?? '');
@@ -70,8 +138,6 @@ export default function ConfiguracoesPage() {
         setEmailContato(tenant.email ?? '');
         setCorPrimaria(tenant.cor_primaria ?? '#0056B3');
       }
-
-      // Load dropdown options via API (usa admin client, contorna RLS)
       const opcoes = await fetchOpcoes();
       setUnidades(opcoes.filter(o => o.categoria === 'unidade').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
       setSetores(opcoes.filter(o => o.categoria === 'setor').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
@@ -79,7 +145,6 @@ export default function ConfiguracoesPage() {
       setItensInspecao(opcoes.filter(o => o.categoria === 'item_inspecao').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
       setLoadingOpcoes(false);
     }
-
     load();
   }, []);
 
@@ -89,12 +154,15 @@ export default function ConfiguracoesPage() {
       .from('tenants')
       .update({ nome: empresa, cnpj, email: emailContato, cor_primaria: corPrimaria })
       .eq('id', (await supabase.from('tenants').select('id').single()).data?.id);
-
-    if (!error) applyBrandColor(corPrimaria)
+    if (!error) applyBrandColor(corPrimaria);
     showToast(error ? `⚠️ Erro: ${error.message}` : '✅ Dados da empresa salvos!');
   };
 
-  const handleAdicionarOpcao = async (cat: Categoria) => {
+  const handleInputChange = useCallback((cat: Categoria, val: string) => {
+    setNovaOpcao(prev => ({ ...prev, [cat]: val }));
+  }, []);
+
+  const handleAdicionar = useCallback(async (cat: Categoria) => {
     const valor = novaOpcao[cat].trim();
     if (!valor) return;
 
@@ -102,77 +170,27 @@ export default function ConfiguracoesPage() {
     if (json.error) { showToast(`⚠️ ${json.error}`); return; }
 
     const nova: Opcao = { id: json.opcao.id, valor: json.opcao.valor, ativo: json.opcao.ativo };
-    if (cat === 'unidade') setUnidades(prev => [...prev, nova].sort((a, b) => a.valor.localeCompare(b.valor)));
-    if (cat === 'setor') setSetores(prev => [...prev, nova].sort((a, b) => a.valor.localeCompare(b.valor)));
-    if (cat === 'area') setAreas(prev => [...prev, nova].sort((a, b) => a.valor.localeCompare(b.valor)));
+    const sort = (a: Opcao, b: Opcao) => a.valor.localeCompare(b.valor);
+    if (cat === 'unidade')      setUnidades(prev => [...prev, nova].sort(sort));
+    if (cat === 'setor')        setSetores(prev => [...prev, nova].sort(sort));
+    if (cat === 'area')         setAreas(prev => [...prev, nova].sort(sort));
     if (cat === 'item_inspecao') setItensInspecao(prev => [...prev, nova]);
 
     setNovaOpcao(prev => ({ ...prev, [cat]: '' }));
     showToast(`✅ "${valor}" adicionado!`);
-  };
+  }, [novaOpcao]);
 
-  const handleRemoverOpcao = async (cat: Categoria, id: string, valor: string) => {
+  const handleRemover = useCallback(async (cat: Categoria, id: string, valor: string) => {
     const json = await removerOpcaoAPI(id);
     if (json.error) { showToast(`⚠️ ${json.error}`); return; }
 
-    if (cat === 'unidade') setUnidades(prev => prev.filter(o => o.id !== id));
-    if (cat === 'setor') setSetores(prev => prev.filter(o => o.id !== id));
-    if (cat === 'area') setAreas(prev => prev.filter(o => o.id !== id));
+    if (cat === 'unidade')      setUnidades(prev => prev.filter(o => o.id !== id));
+    if (cat === 'setor')        setSetores(prev => prev.filter(o => o.id !== id));
+    if (cat === 'area')         setAreas(prev => prev.filter(o => o.id !== id));
     if (cat === 'item_inspecao') setItensInspecao(prev => prev.filter(o => o.id !== id));
 
     showToast(`🗑️ "${valor}" removido.`);
-  };
-
-  const OpcaoManager = ({ cat, lista, icon, label }: { cat: Categoria; lista: Opcao[]; icon: React.ReactNode; label: string }) => (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="p-2.5 bg-brand-primary/10 rounded-xl text-brand-primary">{icon}</div>
-        <h3 className="text-base font-bold text-gray-900">{label}</h3>
-        <span className="ml-auto text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full font-semibold">{lista.length} opções</span>
-      </div>
-
-      {/* Add new */}
-      <div className="flex gap-2 mb-4">
-        <input
-          type="text"
-          value={novaOpcao[cat]}
-          onChange={e => setNovaOpcao(prev => ({ ...prev, [cat]: e.target.value }))}
-          onKeyDown={e => e.key === 'Enter' && handleAdicionarOpcao(cat)}
-          placeholder={`Nova opção de ${label.toLowerCase()}...`}
-          className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
-        />
-        <button
-          onClick={() => handleAdicionarOpcao(cat)}
-          disabled={!novaOpcao[cat].trim()}
-          className="px-4 py-2.5 bg-brand-primary text-white rounded-xl text-sm font-bold hover:bg-brand-primary/90 disabled:opacity-40 transition-all flex items-center gap-1.5"
-        >
-          <Plus className="w-4 h-4" /> Adicionar
-        </button>
-      </div>
-
-      {/* List */}
-      {loadingOpcoes ? (
-        <div className="text-center py-6 text-gray-400 text-sm">Carregando...</div>
-      ) : lista.length === 0 ? (
-        <div className="text-center py-6 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-xl">Nenhuma opção cadastrada</div>
-      ) : (
-        <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-          {lista.map(op => (
-            <div key={op.id} className="flex items-center justify-between px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-100 group">
-              <span className="text-sm text-gray-800 font-medium">{op.valor}</span>
-              <button
-                onClick={() => handleRemoverOpcao(cat, op.id, op.valor)}
-                className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                title="Remover"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  }, []);
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500">
@@ -183,14 +201,14 @@ export default function ConfiguracoesPage() {
       )}
 
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center">
-          <Settings className="w-8 h-8 mr-3 text-brand-primary" />
+        <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+          <Settings className="w-8 h-8 text-brand-primary" />
           Configurações
         </h1>
         <p className="text-gray-500 mt-1">Gerencie empresa, dropdowns do checklist e preferências da plataforma.</p>
       </div>
 
-      {/* Tab switcher */}
+      {/* Tabs */}
       <div className="flex gap-2 border-b border-gray-200">
         <button
           onClick={() => setAbaAtiva('empresa')}
@@ -206,9 +224,9 @@ export default function ConfiguracoesPage() {
         </button>
       </div>
 
+      {/* Aba Empresa */}
       {abaAtiva === 'empresa' && (
         <>
-          {/* Empresa */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
             <div className="flex items-center mb-6">
               <div className="p-2.5 bg-brand-primary/10 rounded-xl text-brand-primary mr-3"><Building className="w-5 h-5" /></div>
@@ -233,27 +251,14 @@ export default function ConfiguracoesPage() {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Cor Primária da Marca</label>
                 <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={corPrimaria}
+                  <input type="color" value={corPrimaria}
                     onChange={e => { setCorPrimaria(e.target.value); applyBrandColor(e.target.value); }}
-                    className="w-12 h-12 rounded-lg border border-gray-300 cursor-pointer p-1"
-                  />
-                  <input
-                    type="text"
-                    value={corPrimaria}
-                    onChange={e => {
-                      setCorPrimaria(e.target.value)
-                      if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) applyBrandColor(e.target.value)
-                    }}
+                    className="w-12 h-12 rounded-lg border border-gray-300 cursor-pointer p-1" />
+                  <input type="text" value={corPrimaria}
+                    onChange={e => { setCorPrimaria(e.target.value); if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) applyBrandColor(e.target.value); }}
                     placeholder="#0056B3"
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary text-sm font-mono"
-                  />
-                  <div
-                    className="w-10 h-10 rounded-lg border border-gray-200 flex-shrink-0 shadow-inner"
-                    style={{ backgroundColor: corPrimaria }}
-                    title="Preview da cor"
-                  />
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary text-sm font-mono" />
+                  <div className="w-10 h-10 rounded-lg border border-gray-200 flex-shrink-0 shadow-inner" style={{ backgroundColor: corPrimaria }} />
                 </div>
                 <p className="text-xs text-gray-400 mt-1">A cor é aplicada em tempo real na interface.</p>
               </div>
@@ -266,7 +271,6 @@ export default function ConfiguracoesPage() {
             </div>
           </div>
 
-          {/* Notificações */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
             <div className="flex items-center mb-6">
               <div className="p-2.5 bg-yellow-100 rounded-xl text-yellow-600 mr-3"><Bell className="w-5 h-5" /></div>
@@ -292,7 +296,6 @@ export default function ConfiguracoesPage() {
             </div>
           </div>
 
-          {/* Segurança */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
             <div className="flex items-center mb-6">
               <div className="p-2.5 bg-green-100 rounded-xl text-green-600 mr-3"><Shield className="w-5 h-5" /></div>
@@ -323,25 +326,39 @@ export default function ConfiguracoesPage() {
         </>
       )}
 
+      {/* Aba Checklist */}
       {abaAtiva === 'checklist' && (
         <>
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-start gap-3">
             <ClipboardList className="w-5 h-5 text-brand-primary mt-0.5 shrink-0" />
             <div>
               <p className="text-sm font-semibold text-brand-primary">Campos configuráveis do Checklist Diário</p>
-              <p className="text-xs text-blue-700 mt-1">Todas as opções abaixo aparecem no aplicativo mobile. Alterações refletem imediatamente para todos os motoristas. O campo <strong>Veículo</strong> é gerenciado na tela de Frota.</p>
+              <p className="text-xs text-blue-700 mt-1">
+                Todas as opções abaixo aparecem no aplicativo mobile. Alterações refletem imediatamente para todos os motoristas.
+                O campo <strong>Veículo</strong> é gerenciado na tela de Frota.
+              </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <OpcaoManager cat="unidade" lista={unidades} label="Unidades" icon={<MapPin className="w-4 h-4" />} />
-            <OpcaoManager cat="setor" lista={setores} label="Setores" icon={<Briefcase className="w-4 h-4" />} />
-            <OpcaoManager cat="area" lista={areas} label="Áreas" icon={<Grid3X3 className="w-4 h-4" />} />
+            <OpcaoManager cat="unidade" lista={unidades} label="Unidades"
+              icon={<MapPin className="w-4 h-4" />} loading={loadingOpcoes}
+              inputValue={novaOpcao.unidade} onInputChange={handleInputChange}
+              onAdicionar={handleAdicionar} onRemover={handleRemover} />
+            <OpcaoManager cat="setor" lista={setores} label="Setores"
+              icon={<Briefcase className="w-4 h-4" />} loading={loadingOpcoes}
+              inputValue={novaOpcao.setor} onInputChange={handleInputChange}
+              onAdicionar={handleAdicionar} onRemover={handleRemover} />
+            <OpcaoManager cat="area" lista={areas} label="Áreas"
+              icon={<Grid3X3 className="w-4 h-4" />} loading={loadingOpcoes}
+              inputValue={novaOpcao.area} onInputChange={handleInputChange}
+              onAdicionar={handleAdicionar} onRemover={handleRemover} />
           </div>
 
-          <div className="mt-2">
-            <OpcaoManager cat="item_inspecao" lista={itensInspecao} label="Itens de Inspeção Técnica" icon={<Wrench className="w-4 h-4" />} />
-          </div>
+          <OpcaoManager cat="item_inspecao" lista={itensInspecao} label="Itens de Inspeção Técnica"
+            icon={<Wrench className="w-4 h-4" />} loading={loadingOpcoes}
+            inputValue={novaOpcao.item_inspecao} onInputChange={handleInputChange}
+            onAdicionar={handleAdicionar} onRemover={handleRemover} />
         </>
       )}
 
