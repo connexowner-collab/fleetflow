@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client';
 import {
   Search, AlertTriangle, CheckCircle2, Clock, Car, User, Camera,
   ClipboardCheck, X, FileSignature, AlertOctagon, ChevronRight,
@@ -39,12 +38,13 @@ export default function ChecklistsPage() {
 
   const fetchInspections = async () => {
     try {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('checklists').select('id, codigo, motorista_nome, placa, km_atual, status, tem_avaria, created_at')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      setInspections((data || []).map(c => ({
+      const res = await fetch('/api/admin/checklists?limit=100');
+      if (!res.ok) throw new Error('Erro ao buscar checklists');
+      const json = await res.json();
+      setInspections((json.checklists || []).map((c: {
+        id: string; codigo?: string; motorista_nome?: string; placa?: string;
+        km_atual?: number; status?: string; tem_avaria?: boolean; created_at: string;
+      }) => ({
         id: c.codigo || c.id, id_real: c.id,
         motorista: c.motorista_nome || '', placa: c.placa || '',
         data: new Date(c.created_at).toLocaleDateString('pt-BR') + ', ' +
@@ -63,27 +63,32 @@ export default function ChecklistsPage() {
     setSelectedItens([]); setSelectedFotos([]);
     setLoadingDetail(true);
     try {
-      const supabase = createClient();
-      const [itensRes, fotosRes] = await Promise.all([
-        supabase.from('checklist_itens').select('nome, conforme').eq('checklist_id', insp.id_real),
-        supabase.from('checklist_fotos').select('tipo, url').eq('checklist_id', insp.id_real),
-      ]);
-      setSelectedItens(itensRes.data ?? []);
-      setSelectedFotos(fotosRes.data ?? []);
+      const res = await fetch(`/api/admin/checklists/${insp.id_real}`);
+      if (!res.ok) throw new Error('Erro ao buscar detalhes');
+      const json = await res.json();
+      setSelectedItens(json.itens ?? []);
+      setSelectedFotos(json.fotos ?? []);
     } catch { /* drawer still shows */ }
     finally { setLoadingDetail(false); }
   };
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
 
+  async function patchChecklist(id: string, status: string, obs?: string) {
+    const res = await fetch('/api/admin/checklists', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status, observacao_validacao: obs }),
+    });
+    if (!res.ok) throw new Error('Erro ao atualizar checklist');
+    return res.json();
+  }
+
   const handleValidar = async (inspection: Inspection) => {
     const obs = prompt('Observação de validação (obrigatória):');
     if (!obs?.trim()) return;
     try {
-      const supabase = createClient();
-      const { error } = await supabase.from('checklists')
-        .update({ status: 'Validado', observacao_validacao: obs.trim() }).eq('id', inspection.id_real);
-      if (error) throw error;
+      await patchChecklist(inspection.id_real, 'Validado', obs.trim());
       setInspections(prev => prev.map(i => i.id_real === inspection.id_real ? { ...i, status: 'Validado' } : i));
       setSelectedInspection(null);
       showToast(`✅ Checklist ${inspection.id} validado!`);
@@ -92,9 +97,7 @@ export default function ChecklistsPage() {
 
   const handleAprovar = async (inspection: Inspection) => {
     try {
-      const supabase = createClient();
-      const { error } = await supabase.from('checklists').update({ status: 'Aprovado' }).eq('id', inspection.id_real);
-      if (error) throw error;
+      await patchChecklist(inspection.id_real, 'Aprovado');
       setInspections(prev => prev.map(i => i.id_real === inspection.id_real ? { ...i, status: 'Aprovado' } : i));
       setSelectedInspection(null);
       showToast(`✅ Checklist ${inspection.id} aprovado!`);
@@ -103,9 +106,7 @@ export default function ChecklistsPage() {
 
   const handleRecusar = async (inspection: Inspection) => {
     try {
-      const supabase = createClient();
-      const { error } = await supabase.from('checklists').update({ status: 'Recusado' }).eq('id', inspection.id_real);
-      if (error) throw error;
+      await patchChecklist(inspection.id_real, 'Recusado');
       setInspections(prev => prev.map(i => i.id_real === inspection.id_real ? { ...i, status: 'Recusado' } : i));
       setSelectedInspection(null);
       showToast(`Checklist ${inspection.id} recusado.`);
