@@ -64,17 +64,16 @@ export default function NotificacoesPage() {
 
       {/* Header */}
       <AppHeader onBack={() => router.back()} showActions={false} />
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Notificações</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Fique por dentro das atualizações da sua frota.</p>
-          </div>
-          {recentes.length > 0 && (
-            <button onClick={marcarTodas} className="text-indigo-600 text-xs font-bold text-right leading-tight mt-1">
-              MARCAR TODAS<br />COMO LIDAS
-            </button>
-          )}
+      <div className="px-5 pt-5 pb-2 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Notificações</h1>
+          <p className="text-gray-500 text-sm mt-0.5">Fique por dentro das atualizações da sua frota.</p>
         </div>
+        {recentes.length > 0 && (
+          <button onClick={marcarTodas} className="text-indigo-600 text-xs font-bold text-right leading-tight mt-1">
+            MARCAR TODAS<br />COMO LIDAS
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pt-4 space-y-4 pb-24">
