@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react';
 import { 
   Truck, Calendar, MapPin, Activity, FileText, ClipboardList, 
   ChevronLeft, Loader2, AlertCircle, CheckCircle2, 
-  ExternalLink, User, Fuel, Gauge, Hash, Box
+  ExternalLink, User, Fuel, Gauge, Hash, Box, Plus, X, Edit2, Trash2, Clock, AlertTriangle, Paperclip, ChevronDown, CheckCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -33,11 +33,33 @@ type Vehicle = {
 
 type Documento = {
   id: string;
+  veiculo_id: string;
   tipo: string;
   data_vencimento: string | null;
   url_anexo: string | null;
   observacao: string | null;
+  status?: 'ok' | 'vence_em_breve' | 'vencido' | 'sem_data';
 };
+
+function getStatus(data_vencimento: string | null): 'ok' | 'vence_em_breve' | 'vencido' | 'sem_data' {
+  if (!data_vencimento) return 'sem_data';
+  const hoje = new Date();
+  const venc = new Date(data_vencimento + 'T12:00:00');
+  const diff = Math.floor((venc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+  if (diff < 0) return 'vencido';
+  if (diff <= 30) return 'vence_em_breve';
+  return 'ok';
+}
+
+const STATUS_CONFIG = {
+  ok:             { label: 'Válido',         color: 'bg-emerald-100 text-emerald-700', border: 'border-emerald-100', bar: 'bg-emerald-500', icon: CheckCircle2  },
+  vence_em_breve: { label: 'Vence em breve', color: 'bg-amber-100 text-amber-700',     border: 'border-amber-100',   bar: 'bg-amber-400',   icon: Clock        },
+  vencido:        { label: 'Vencido',        color: 'bg-red-100 text-red-700',         border: 'border-red-100',     bar: 'bg-red-500',     icon: AlertTriangle },
+  sem_data:       { label: 'Sem data',       color: 'bg-gray-100 text-gray-500',       border: 'border-gray-100',    bar: 'bg-gray-300',    icon: FileText     },
+};
+
+const TIPOS_DOC = ['CRLV', 'Seguro', 'Licença', 'Tacógrafo', 'ANTT', 'Outros'];
+const inputCls = 'w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary transition-all';
 
 type Checklist = {
   id: string;
@@ -58,6 +80,25 @@ export default function VehicleDetailsPage({ params }: { params: Promise<{ id: s
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Estados para CRUD de Documentos
+  const [showDocForm, setShowDocForm] = useState(false);
+  const [editandoDoc, setEditandoDoc] = useState<Documento | null>(null);
+  const [salvandoDoc, setSalvandoDoc] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [docForm, setDocForm] = useState({ veiculo_id: id, tipo: 'CRLV', data_vencimento: '', observacao: '', url_anexo: '' });
+
+  const fetchDocuments = async () => {
+    try {
+      const res = await fetch(`/api/admin/frota/documentos?veiculo_id=${id}`);
+      const data = await res.json();
+      const enriched = (data.documentos ?? []).map((d: Documento) => ({
+        ...d,
+        status: getStatus(d.data_vencimento)
+      }));
+      setDocuments(enriched);
+    } catch (err) { console.error(err); }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -71,10 +112,7 @@ export default function VehicleDetailsPage({ params }: { params: Promise<{ id: s
           setError('Veículo não encontrado');
         }
 
-        // Busca documentos
-        const resD = await fetch(`/api/admin/frota/documentos?veiculo_id=${id}`);
-        const dataD = await resD.json();
-        setDocuments(dataD.documentos ?? []);
+        await fetchDocuments();
 
         // Busca checklists
         const resC = await fetch(`/api/admin/frota/checklists?veiculo_id=${id}`);
@@ -91,6 +129,68 @@ export default function VehicleDetailsPage({ params }: { params: Promise<{ id: s
 
     fetchData();
   }, [id]);
+
+  // Funções CRUD Documentos
+  function abrirFormDoc(doc?: Documento) {
+    if (doc) {
+      setEditandoDoc(doc);
+      setDocForm({
+        veiculo_id: id,
+        tipo: doc.tipo,
+        data_vencimento: doc.data_vencimento ?? '',
+        observacao: doc.observacao ?? '',
+        url_anexo: doc.url_anexo ?? ''
+      });
+    } else {
+      setEditandoDoc(null);
+      setDocForm({ veiculo_id: id, tipo: 'CRLV', data_vencimento: '', observacao: '', url_anexo: '' });
+    }
+    setShowDocForm(true);
+  }
+
+  async function handleDocFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingDoc(true);
+    try {
+      const supabase = createClient();
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const filePath = `docs/${fileName}`;
+      const { error: uploadError } = await supabase.storage.from('fleetflow-docs').upload(filePath, file);
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from('fleetflow-docs').getPublicUrl(filePath);
+      setDocForm(f => ({ ...f, url_anexo: publicUrl }));
+    } catch (err) { console.error(err); alert('Erro ao subir arquivo.'); }
+    finally { setUploadingDoc(false); }
+  }
+
+  async function salvarDoc() {
+    setSalvandoDoc(true);
+    try {
+      const res = await fetch('/api/admin/frota/documentos', {
+        method: editandoDoc ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editandoDoc
+          ? { id: editandoDoc.id, data_vencimento: docForm.data_vencimento, observacao: docForm.observacao, url_anexo: docForm.url_anexo }
+          : docForm),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setShowDocForm(false); 
+      fetchDocuments();
+    } catch (err) { console.error(err); alert('Erro ao salvar documento.'); }
+    finally { setSalvandoDoc(false); }
+  }
+
+  async function excluirDoc(docId: string) {
+    if (!confirm('Excluir este documento?')) return;
+    try {
+      const supabase = createClient();
+      await supabase.from('veiculo_documentos').delete().eq('id', docId);
+      fetchDocuments();
+    } catch (err) { console.error(err); }
+  }
 
   if (loading) {
     return (
@@ -205,47 +305,65 @@ export default function VehicleDetailsPage({ params }: { params: Promise<{ id: s
 
           {activeTab === 'documentos' && (
             <div className="space-y-4">
+              <div className="flex justify-end">
+                <button onClick={() => abrirFormDoc()}
+                  className="flex items-center gap-1.5 bg-brand-primary text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md shadow-brand-primary/10 hover:bg-brand-primary/90 transition-all active:scale-95">
+                  <Plus className="w-4 h-4" /> Novo Documento
+                </button>
+              </div>
+
               {documents.length === 0 ? (
                 <EmptyState icon={FileText} message="Nenhum documento encontrado." />
               ) : (
                 <div className="grid gap-3">
-                  {documents.map(doc => (
-                    <div key={doc.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-gray-100/50 transition-all">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-gray-400 shadow-sm border border-gray-100">
-                          <FileText className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-gray-900">{doc.tipo}</p>
-                          <p className="text-xs text-gray-500">
-                            {doc.data_vencimento 
-                              ? `Vencimento: ${new Date(doc.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}`
-                              : 'Sem data de vencimento'}
-                          </p>
+                  {documents.map(doc => {
+                    const st = doc.status ?? 'sem_data';
+                    const sc = STATUS_CONFIG[st as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.sem_data;
+                    const Icon = sc.icon;
+                    return (
+                      <div key={doc.id} className={`bg-white rounded-2xl border flex items-stretch overflow-hidden ${sc.border}`}>
+                        <div className={`w-1 shrink-0 ${sc.bar}`} />
+                        <div className="flex-1 px-4 py-3.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className="text-sm font-black text-gray-900">{doc.tipo}</span>
+                              </div>
+                              <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
+                                {doc.data_vencimento && (
+                                  <span>Vence: {new Date(doc.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+                                )}
+                                {doc.url_anexo && (
+                                  <a href={doc.url_anexo} target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-brand-primary font-bold hover:underline">
+                                    <Paperclip className="w-3 h-3" /> VER ANEXO
+                                  </a>
+                                )}
+                              </div>
+                              {doc.observacao && (
+                                <p className="text-xs text-gray-400 mt-1 truncate">{doc.observacao}</p>
+                              )}
+                            </div>
+                            <div className="flex flex-col items-end gap-2 shrink-0">
+                              <span className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${sc.color}`}>
+                                <Icon className="w-3 h-3" />{sc.label}
+                              </span>
+                              <div className="flex gap-1">
+                                <button onClick={() => abrirFormDoc(doc)}
+                                  className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-300 hover:text-gray-600 transition-colors">
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button onClick={() => excluirDoc(doc.id)}
+                                  className="p-1.5 rounded-xl hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {doc.url_anexo && (
-                          <a 
-                            href={doc.url_anexo} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="p-2 bg-brand-primary/10 text-brand-primary rounded-lg hover:bg-brand-primary/20 transition-all"
-                            title="Ver documento"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
-                        )}
-                        <span className={`px-2 py-0.5 text-[10px] font-black rounded-full border ${
-                          doc.data_vencimento && new Date(doc.data_vencimento) < new Date()
-                            ? 'bg-red-100 text-red-600 border-red-200'
-                            : 'bg-green-100 text-green-600 border-green-200'
-                        }`}>
-                          {doc.data_vencimento && new Date(doc.data_vencimento) < new Date() ? 'VENCIDO' : 'VÁLIDO'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -294,6 +412,80 @@ export default function VehicleDetailsPage({ params }: { params: Promise<{ id: s
           )}
         </div>
       </div>
+
+      {/* Modal Documento */}
+      {showDocForm && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setShowDocForm(false)} />
+          <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom duration-300">
+            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mt-3 mb-1 sm:hidden" />
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-brand-primary/10 rounded-xl flex items-center justify-center">
+                  <FileText className="w-4 h-4 text-brand-primary" />
+                </div>
+                <h2 className="text-base font-bold text-gray-900">{editandoDoc ? 'Editar Documento' : 'Novo Documento'}</h2>
+              </div>
+              <button onClick={() => setShowDocForm(false)} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tipo</label>
+                  <div className="relative">
+                    <select className={inputCls + ' appearance-none pr-8'}
+                      value={docForm.tipo} onChange={e => setDocForm(f => ({ ...f, tipo: e.target.value }))}>
+                      {TIPOS_DOC.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2.5 top-3 pointer-events-none" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Anexo (Foto/PDF)</label>
+                  <label className={`flex items-center justify-center gap-2 ${inputCls} cursor-pointer hover:bg-gray-100 transition-colors`}>
+                    <input type="file" className="hidden" onChange={handleDocFileUpload} accept="image/*,application/pdf" />
+                    {uploadingDoc ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : docForm.url_anexo ? (
+                      <>
+                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                        <span className="text-emerald-600 font-bold">Pronto</span>
+                      </>
+                    ) : (
+                      <>
+                        <Paperclip className="w-5 h-5 text-gray-400" />
+                        <span className="text-gray-400">Subir</span>
+                      </>
+                    )}
+                  </label>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Data de Vencimento</label>
+                <input type="date" className={inputCls} value={docForm.data_vencimento}
+                  onChange={e => setDocForm(f => ({ ...f, data_vencimento: e.target.value }))} />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Observação</label>
+                <textarea rows={2} className={inputCls + ' resize-none'} value={docForm.observacao}
+                  onChange={e => setDocForm(f => ({ ...f, observacao: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex gap-3 p-5 border-t border-gray-100">
+              <button onClick={() => setShowDocForm(false)}
+                className="flex-1 py-3 rounded-2xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={salvarDoc} disabled={salvandoDoc || uploadingDoc}
+                className="flex-1 py-3 rounded-2xl bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary/90 transition-colors disabled:opacity-50 shadow-lg shadow-brand-primary/20">
+                {salvandoDoc ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
