@@ -27,13 +27,34 @@ async function enviarEmailAcesso(params: {
   if (!apiKey) return
 
   const resend = new Resend(apiKey)
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://fleetflow-tau.vercel.app'
+  const portalUrl = 'https://webapp-peach-six.vercel.app'
+  const appPwaUrl = 'https://fleetflow-tau.vercel.app'
 
   const acessoTexto = params.acesso === 'app'
-    ? 'Aplicativo Mobile (Android)'
+    ? 'Aplicativo Mobile (PWA)'
     : params.acesso === 'web'
     ? 'Painel Web'
     : 'Aplicativo Mobile + Painel Web'
+
+  let botoesAcesso = ''
+  if (params.acesso === 'app' || params.acesso === 'ambos') {
+    botoesAcesso += `
+      <div style="text-align: center; margin-bottom: 12px;">
+        <a href="${appPwaUrl}/app/login" style="display: inline-block; background: #16a34a; color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 900; font-size: 15px; width: 220px;">
+          Acessar o Aplicativo →
+        </a>
+      </div>
+    `
+  }
+  if (params.acesso === 'web' || params.acesso === 'ambos') {
+    botoesAcesso += `
+      <div style="text-align: center; margin-bottom: 28px;">
+        <a href="${portalUrl}/login" style="display: inline-block; background: #0056B3; color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 900; font-size: 15px; width: 220px;">
+          Acessar o Painel Web →
+        </a>
+      </div>
+    `
+  }
 
   await resend.emails.send({
     from: 'FleetFlow <noreply@fleetflow.com.br>',
@@ -67,12 +88,7 @@ async function enviarEmailAcesso(params: {
             <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 16px; margin-bottom: 28px;">
               <p style="margin: 0; font-size: 13px; color: #166534;">✅ <strong>Tipo de acesso:</strong> ${acessoTexto}</p>
             </div>
-            ${params.acesso !== 'app' ? `
-            <div style="text-align: center; margin-bottom: 28px;">
-              <a href="${appUrl}/login" style="display: inline-block; background: #0056B3; color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 900; font-size: 15px;">
-                Acessar o Painel Web →
-              </a>
-            </div>` : ''}
+            ${botoesAcesso}
             <p style="color: #94a3b8; font-size: 12px; margin: 0; line-height: 1.6;">
               Por segurança, recomendamos alterar sua senha após o primeiro acesso.
             </p>
