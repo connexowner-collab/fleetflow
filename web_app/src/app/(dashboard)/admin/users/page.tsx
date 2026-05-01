@@ -490,7 +490,7 @@ export default function UsersManagement() {
                       </button>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-end gap-1 transition-opacity">
                         <button onClick={() => openEditar(u)} title="Editar"
                           className="p-2 rounded-xl text-gray-400 hover:text-brand-primary hover:bg-brand-primary/10 transition-all">
                           <Pencil className="w-4 h-4" />
