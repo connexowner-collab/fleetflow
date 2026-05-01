@@ -177,6 +177,7 @@ export default function UsersManagement() {
   const [editTelefone, setEditTelefone] = useState('');
   const [editFilial, setEditFilial] = useState('');
   const [editRole, setEditRole] = useState('Motorista');
+  const [editAcesso, setEditAcesso] = useState('app');
   const [editTelas, setEditTelas] = useState<string[]>([]);
   const [editVeiculoId, setEditVeiculoId] = useState('');
 
@@ -284,6 +285,7 @@ export default function UsersManagement() {
     setEditTelefone(u.telefone ?? '');
     setEditFilial(u.filial ?? '');
     setEditRole(perfilLabel[u.perfil] ?? 'Motorista');
+    setEditAcesso(u.acesso ?? 'app');
     setEditTelas(u.telas_permitidas ?? ['checklist', 'troca', 'ocorrencia', 'historico']);
     setEditVeiculoId(u.veiculo_id ?? '');
     setModalEditar(u);
@@ -298,6 +300,7 @@ export default function UsersManagement() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nome: editNome, cargo: editRole,
+        acesso: editAcesso,
         telas_permitidas: editTelas,
         veiculo_id: editVeiculoId || null,
         placa: veiculo?.placa || null,
@@ -438,10 +441,7 @@ export default function UsersManagement() {
                   <th className="px-5 py-4">Telefone</th>
                   <th className="px-5 py-4">Filial</th>
                   <th className="px-5 py-4">Perfil</th>
-                  <th className="px-5 py-4">Plataforma</th>
                   <th className="px-5 py-4">Veículo</th>
-                  <th className="px-5 py-4">Telas App</th>
-                  <th className="px-5 py-4">Cadastro</th>
                   <th className="px-5 py-4 text-center">Status</th>
                   <th className="px-5 py-4 text-right">Ações</th>
                 </tr>
@@ -476,12 +476,6 @@ export default function UsersManagement() {
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <span className="flex items-center gap-1 text-xs font-bold text-gray-600 bg-gray-50 border border-gray-200 px-2 py-1 rounded-lg">
-                        {u.acesso === 'app' ? <Smartphone className="w-3 h-3" /> : u.acesso === 'web' ? <Monitor className="w-3 h-3" /> : <Globe className="w-3 h-3" />}
-                        {acessoLabel[u.acesso] ?? u.acesso}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
                       {u.veiculos ? (
                         <span className="flex items-center gap-1.5 font-bold text-gray-700 bg-blue-50 px-2.5 py-1 rounded-lg text-xs border border-blue-100">
                           <Truck className="w-3 h-3 text-brand-primary" />
@@ -489,17 +483,6 @@ export default function UsersManagement() {
                         </span>
                       ) : <span className="text-gray-300 text-xs">—</span>}
                     </td>
-                    <td className="px-5 py-4">
-                      <div className="flex flex-wrap gap-1">
-                        {(u.telas_permitidas ?? []).map(t => {
-                          const tela = TELAS.find(x => x.id === t);
-                          return tela ? (
-                            <span key={t} title={tela.label} className="text-sm">{tela.icon}</span>
-                          ) : null;
-                        })}
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 text-xs text-gray-400">{u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '—'}</td>
                     <td className="px-5 py-4 text-center">
                       <button onClick={() => handleToggleStatus(u)}
                         className={`flex items-center gap-1.5 mx-auto px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all hover:scale-105 ${u.ativo ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}>
@@ -753,16 +736,31 @@ export default function UsersManagement() {
                         {filiaisDisponiveis.map(f => <option key={f} value={f} />)}
                       </datalist>
                     </div>
-                    <div className="col-span-2">
+                    <div>
                       <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Perfil</label>
                       <select value={editRole} onChange={e => setEditRole(e.target.value)}
                         className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none bg-white font-bold text-gray-900">
                         <option>Motorista</option><option>Analista de Frota</option><option>Gestor</option><option>Diretor</option>
                       </select>
                     </div>
+                    <div>
+                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Plataforma</label>
+                      <select value={editAcesso} onChange={e => setEditAcesso(e.target.value)}
+                        className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none bg-white font-bold text-gray-900">
+                        <option value="app">App Mobile</option>
+                        <option value="web">Painel Web</option>
+                        <option value="ambos">App + Painel Web</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 flex items-center justify-between">
+                    <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Data de Cadastro</span>
+                    <span className="text-sm font-bold text-gray-600">{modalEditar.created_at ? fmtDate(modalEditar.created_at) : '—'}</span>
                   </div>
                   <VeiculoSelect value={editVeiculoId} onChange={setEditVeiculoId} veiculos={veiculos} />
-                  <TelasList list={editTelas} setList={setEditTelas} />
+                  {(editAcesso === 'app' || editAcesso === 'ambos') && (
+                    <TelasList list={editTelas} setList={setEditTelas} />
+                  )}
                 </div>
                 <div className="border-t px-8 py-5 flex gap-3 shrink-0">
                   <button onClick={() => setModalEditar(null)} className="flex-1 py-3 text-xs font-black text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-xl uppercase tracking-widest">Cancelar</button>
