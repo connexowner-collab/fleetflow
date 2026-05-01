@@ -5,6 +5,7 @@ import {
   ChevronLeft, Wrench, Plus, X, Clock, CheckCircle2,
   AlertTriangle, FileText, Loader2, Car, Bell,
 } from 'lucide-react'
+import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
 type StatusManutencao =
@@ -313,18 +314,7 @@ export default function ManutencaoPage() {
   return (
     <div className="flex flex-col min-h-screen bg-[#F4F6FB] pb-20">
 
-      {/* Header */}
-      <div className="bg-white px-5 pt-12 pb-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                 style={{ background: 'linear-gradient(135deg,#4B3FE4,#7C3AED)' }}>
-              <Car className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-gray-900">FleetFlow</span>
-          </div>
-          <Bell className="w-5 h-5 text-gray-400" />
-        </div>
+      <AppHeader showActions={false} />
         <h1 className="text-2xl font-bold text-gray-900">Manutenções</h1>
         <p className="text-gray-500 text-sm mt-0.5">Solicite e acompanhe manutenções do seu veículo.</p>
       </div>

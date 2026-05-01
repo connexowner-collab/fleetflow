@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Bell, RefreshCw, LogOut, PlayCircle, History, Car, CheckCircle2, ClipboardCheck, AlertTriangle, XCircle } from 'lucide-react'
 import Link from 'next/link'
+import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
 interface Documento { tipo: string; vencimento: string | null }
@@ -129,33 +130,12 @@ export default function AppHome() {
 
   return (
     <div className="flex flex-col h-screen bg-[#F4F6FB]">
-
-      {/* Header */}
-      <div className="bg-white px-5 pt-12 pb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-               style={{ background: 'linear-gradient(135deg,#4B3FE4,#7C3AED)' }}>
-            <Car className="w-4 h-4 text-white" />
-          </div>
-          <span className="font-bold text-gray-900 text-base">FleetFlow</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => load(true)} className="p-2">
-            <RefreshCw className={`w-4 h-4 text-gray-400 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
-          <Link href="/app/notificacoes" className="relative p-2">
-            <Bell className="w-5 h-5 text-gray-600" />
-            {notifs > 0 && (
-              <span className="absolute top-1 right-1 bg-red-500 text-white text-[8px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                {notifs > 9 ? '9+' : notifs}
-              </span>
-            )}
-          </Link>
-          <button onClick={logout} className="p-1">
-            <LogOut className="w-4 h-4 text-gray-400" />
-          </button>
-        </div>
-      </div>
+      <AppHeader 
+        notifs={notifs} 
+        refreshing={refreshing} 
+        onRefresh={() => load(true)} 
+        onLogout={logout} 
+      />
 
       <div className="flex-1 overflow-y-auto px-5 pt-5 space-y-4 pb-24">
 

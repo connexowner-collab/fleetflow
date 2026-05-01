@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Bell, ClipboardCheck, AlertTriangle, FileText, Settings, ArrowLeft } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
 interface Notif {
@@ -62,20 +63,7 @@ export default function NotificacoesPage() {
     <div className="flex flex-col h-screen bg-[#F4F6FB]">
 
       {/* Header */}
-      <div className="bg-white px-5 pt-12 pb-4">
-        <div className="flex items-center gap-3 mb-4">
-          <button onClick={() => router.back()} className="p-1.5 bg-gray-100 rounded-xl">
-            <ArrowLeft className="w-4 h-4 text-gray-600" />
-          </button>
-          <div className="flex items-center gap-2 flex-1">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                 style={{ background: 'linear-gradient(135deg,#4B3FE4,#7C3AED)' }}>
-              <Bell className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-gray-900">FleetFlow</span>
-          </div>
-          <Bell className="w-5 h-5 text-gray-400" />
-        </div>
+      <AppHeader onBack={() => router.back()} showActions={false} />
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Notificações</h1>

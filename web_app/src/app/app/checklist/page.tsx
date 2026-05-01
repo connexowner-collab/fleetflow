@@ -7,6 +7,7 @@ import {
   Car, Bell, ExternalLink,
 } from 'lucide-react'
 import Link from 'next/link'
+import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
 interface ChecklistItem {
@@ -474,20 +475,8 @@ export default function ChecklistPage() {
 
         {etapa < 7 && (
           <>
-            {/* Header */}
-            <div className="bg-white px-5 pt-12 pb-4 shrink-0">
-              <div className="flex items-center gap-3 mb-4">
-                <button onClick={tryVoltar} className="p-1.5 bg-gray-100 rounded-xl">
-                  <ChevronLeft className="w-4 h-4 text-gray-600" />
-                </button>
-                <div className="flex items-center gap-2 flex-1">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                       style={{ background: 'linear-gradient(135deg,#4B3FE4,#7C3AED)' }}>
-                    <Car className="w-4 h-4 text-white" />
-                  </div>
-                  <span className="font-bold text-gray-900">FleetFlow</span>
-                </div>
-              </div>
+            <AppHeader onBack={tryVoltar} showActions={false} />
+            <div className="bg-white px-5 pb-4 shrink-0">
               <h1 className="text-2xl font-bold text-gray-900">Checklist Diário</h1>
               <p className="text-gray-500 text-sm mt-0.5">Etapa {etapa} de 6</p>
               <div className="mt-3">
@@ -857,18 +846,8 @@ export default function ChecklistPage() {
   return (
     <div className="flex flex-col min-h-screen bg-[#F4F6FB] pb-20">
 
-      {/* Header */}
-      <div className="bg-white px-5 pt-12 pb-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                 style={{ background: 'linear-gradient(135deg,#4B3FE4,#7C3AED)' }}>
-              <Car className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-gray-900">FleetFlow</span>
-          </div>
-          <Link href="/app/notificacoes"><Bell className="w-5 h-5 text-gray-400" /></Link>
-        </div>
+      <AppHeader showActions={false} />
+      <div className="bg-white px-5 pb-4">
         <h1 className="text-2xl font-bold text-gray-900">Checklist Diário</h1>
         <p className="text-gray-500 text-sm mt-0.5">Realize a inspeção antes de iniciar a rota.</p>
       </div>

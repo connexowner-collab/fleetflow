@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Eye, EyeOff, X, ChevronRight, Settings, Shield, HelpCircle, LogOut, Car, Building2, Bell } from 'lucide-react'
+import AppHeader from '../components/AppHeader'
 import BottomNav from '../components/BottomNav'
 
 interface Profile {
@@ -122,17 +123,7 @@ export default function PerfilPage() {
   return (
     <div className="flex flex-col h-screen bg-[#F4F6FB]">
 
-      {/* Header */}
-      <div className="bg-white px-5 pt-12 pb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-               style={{ background: 'linear-gradient(135deg,#4B3FE4,#7C3AED)' }}>
-            <Car className="w-4 h-4 text-white" />
-          </div>
-          <span className="font-bold text-gray-900">FleetFlow</span>
-        </div>
-        <Bell className="w-5 h-5 text-gray-400" />
-      </div>
+      <AppHeader showActions={false} />
 
       <div className="flex-1 overflow-y-auto px-5 pt-5 space-y-4 pb-24">
         {/* Avatar + Info */}
