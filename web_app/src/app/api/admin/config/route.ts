@@ -16,7 +16,7 @@ async function getTenantId(email: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const session = getSessionFromRequest(request)
+  const session = await getSessionFromRequest(request)
   if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
 
   const tenantId = await getTenantId(session.email)
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = getSessionFromRequest(request)
+  const session = await getSessionFromRequest(request)
   if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
   if (!['gestor', 'diretor', 'analista'].includes(session.perfil?.toLowerCase()))
     return NextResponse.json({ error: 'Sem permissão.' }, { status: 403 })
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const session = getSessionFromRequest(request)
+  const session = await getSessionFromRequest(request)
   if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
   if (!['gestor', 'diretor', 'analista'].includes(session.perfil?.toLowerCase()))
     return NextResponse.json({ error: 'Sem permissão.' }, { status: 403 })
