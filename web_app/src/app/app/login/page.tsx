@@ -11,12 +11,10 @@ export default function AppLogin() {
   const [mostrarSenha, setMostrarSenha] = useState(false)
   const [loading,      setLoading]      = useState(false)
   const [erro,         setErro]         = useState('')
+  const [mounted,      setMounted]      = useState(false)
 
   useEffect(() => {
-    // Captura prompt de instalação PWA
-    const handler = (e: Event) => { e.preventDefault() }
-    window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
+    setMounted(true)
   }, [])
 
   async function entrar(e: React.FormEvent) {
@@ -42,8 +40,10 @@ export default function AppLogin() {
     }
   }
 
+  if (!mounted) return null
+
   return (
-    <div className="flex flex-col h-screen overflow-y-auto bg-white px-6">
+    <div suppressHydrationWarning className="flex flex-col min-h-screen overflow-y-auto bg-white px-6">
       <div className="flex flex-col items-center justify-center flex-1 gap-6">
 
         {/* Logo */}

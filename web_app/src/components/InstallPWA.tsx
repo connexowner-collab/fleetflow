@@ -14,8 +14,10 @@ export default function InstallPWA() {
   const [prompt, setPrompt]     = useState<BeforeInstallPromptEvent | null>(null)
   const [mostrar, setMostrar]   = useState(false)
   const [instalado, setInstalado] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     // Já está instalado como PWA standalone
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setInstalado(true)
@@ -52,7 +54,7 @@ export default function InstallPWA() {
     }
   }
 
-  if (!mostrar || instalado) return null
+  if (!mounted || !mostrar || instalado) return null
 
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-4 shadow-2xl flex items-center gap-3 md:max-w-sm md:left-auto md:right-4">
