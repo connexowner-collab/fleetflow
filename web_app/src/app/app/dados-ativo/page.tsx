@@ -82,7 +82,7 @@ export default function DadosAtivoPage() {
   useEffect(() => { load() }, [load])
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#F4F6FB] pb-20">
+    <div className="flex flex-col h-screen bg-[#F4F6FB]">
 
       {/* Banner do veículo */}
       <div className="relative"
@@ -144,7 +144,7 @@ export default function DadosAtivoPage() {
         </div>
       </div>
 
-      <div className="px-5 pt-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-5 pt-4 space-y-3 pb-24">
 
         {/* Aba Dados */}
         {aba === 'dados' && !loading && veiculo && (

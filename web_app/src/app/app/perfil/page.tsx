@@ -120,7 +120,7 @@ export default function PerfilPage() {
   ]
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#F4F6FB] pb-20">
+    <div className="flex flex-col h-screen bg-[#F4F6FB]">
 
       {/* Header */}
       <div className="bg-white px-5 pt-12 pb-4 flex items-center justify-between">
@@ -134,7 +134,7 @@ export default function PerfilPage() {
         <Bell className="w-5 h-5 text-gray-400" />
       </div>
 
-      <div className="px-5 pt-5 space-y-4">
+      <div className="flex-1 overflow-y-auto px-5 pt-5 space-y-4 pb-24">
         {/* Avatar + Info */}
         {loading ? (
           <div className="bg-white rounded-3xl h-52 animate-pulse" />
