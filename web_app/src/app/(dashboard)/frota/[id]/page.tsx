@@ -305,6 +305,28 @@ export default function VehicleDetailsPage({ params }: { params: Promise<{ id: s
 
           {activeTab === 'documentos' && (
             <div className="space-y-4">
+              {/* KPIs de Documentos */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-red-50 border border-red-100 rounded-2xl p-3 text-center">
+                  <p className="text-xl font-black text-red-600">
+                    {documents.filter(d => d.status === 'vencido').length}
+                  </p>
+                  <p className="text-[10px] text-red-500 font-bold uppercase tracking-tight">Vencidos</p>
+                </div>
+                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 text-center">
+                  <p className="text-xl font-black text-amber-600">
+                    {documents.filter(d => d.status === 'vence_em_breve').length}
+                  </p>
+                  <p className="text-[10px] text-amber-500 font-bold uppercase tracking-tight">Vencem 30d</p>
+                </div>
+                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-3 text-center">
+                  <p className="text-xl font-black text-emerald-600">
+                    {documents.filter(d => d.status === 'ok').length}
+                  </p>
+                  <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-tight">Válidos</p>
+                </div>
+              </div>
+
               <div className="flex justify-end">
                 <button onClick={() => abrirFormDoc()}
                   className="flex items-center gap-1.5 bg-brand-primary text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md shadow-brand-primary/10 hover:bg-brand-primary/90 transition-all active:scale-95">
