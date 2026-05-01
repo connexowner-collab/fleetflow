@@ -1,7 +1,6 @@
 "use client";
 
 import React from 'react';
-
 import { useState, useEffect, useCallback } from 'react';
 import { Settings, Building, Bell, Shield, Save, CheckCircle, ClipboardList, Plus, Trash2, MapPin, Briefcase, Grid3X3, Wrench } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
@@ -237,9 +236,9 @@ export default function ConfiguracoesPage() {
     const json = await removerOpcaoAPI(id);
     if (json.error) { showToast(`⚠️ ${json.error}`); return; }
 
-    if (cat === 'unidade') setUnidades(prev => prev.filter(o => o.id !== id));
-    if (cat === 'setor') setSetores(prev => prev.filter(o => o.id !== id));
-    if (cat === 'area') setAreas(prev => prev.filter(o => o.id !== id));
+    if (cat === 'unidade')      setUnidades(prev => prev.filter(o => o.id !== id));
+    if (cat === 'setor')        setSetores(prev => prev.filter(o => o.id !== id));
+    if (cat === 'area')         setAreas(prev => prev.filter(o => o.id !== id));
     if (cat === 'item_inspecao') setItensInspecao(prev => prev.filter(o => o.id !== id));
 
     showToast(`🗑️ "${valor}" removido.`);
