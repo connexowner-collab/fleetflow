@@ -82,6 +82,25 @@ export default function DadosAtivoPage() {
 
   useEffect(() => { load() }, [load])
 
+  const handleDownload = async (url: string, filename: string) => {
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(blobUrl)
+    } catch (err) {
+      console.error('Erro ao baixar arquivo:', err)
+      // Fallback: abre em nova aba se o fetch falhar (ex: CORS)
+      window.open(url, '_blank')
+    }
+  }
+
   return (
     <div className="flex flex-col h-screen bg-[#F4F6FB]">
 
@@ -294,10 +313,11 @@ export default function DadosAtivoPage() {
                 className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-50 rounded-2xl transition-all">
                 Fechar
               </button>
-              <a href={selectedDoc.url_anexo || ''} download target="_blank" rel="noopener noreferrer"
+              <button 
+                onClick={() => handleDownload(selectedDoc.url_anexo || '', `${selectedDoc.tipo}_${veiculo?.placa || 'anexo'}`)}
                 className="flex-1 py-3 bg-indigo-600 text-white text-sm font-bold rounded-2xl shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 hover:bg-indigo-700 active:scale-95 transition-all">
                 <Download className="w-4 h-4" /> Baixar
-              </a>
+              </button>
             </div>
           </div>
         </div>
