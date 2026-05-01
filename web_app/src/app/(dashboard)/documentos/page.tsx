@@ -7,7 +7,8 @@ import { createClient } from '@/utils/supabase/client';
 interface Documento {
   id: string; veiculo_id: string; veiculo_placa?: string;
   tipo: string; numero: string | null; data_vencimento: string | null;
-  observacao: string | null; status?: 'ok' | 'vence_em_breve' | 'vencido' | 'sem_data';
+  observacao: string | null; url_anexo?: string | null;
+  status?: 'ok' | 'vence_em_breve' | 'vencido' | 'sem_data';
 }
 
 interface Veiculo { id: string; placa: string; modelo: string }
@@ -48,14 +49,15 @@ export default function DocumentosPage() {
   const [showForm, setShowForm] = useState(false);
   const [editando, setEditando] = useState<Documento | null>(null);
   const [salvando, setSalvando] = useState(false);
-  const [form, setForm] = useState({ veiculo_id: '', tipo: 'CRLV', numero: '', data_vencimento: '', observacao: '' });
+  const [uploading, setUploading] = useState(false);
+  const [form, setForm] = useState({ veiculo_id: '', tipo: 'CRLV', numero: '', data_vencimento: '', observacao: '', url_anexo: '' });
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const supabase = createClient();
       const { data: docs } = await supabase.from('veiculo_documentos')
-        .select('id, veiculo_id, tipo, numero, data_vencimento, observacao').order('tipo');
+        .select('id, veiculo_id, tipo, numero, data_vencimento, observacao, url_anexo').order('tipo');
       const res = await fetch('/api/admin/frota');
       const { veiculos: veics } = await res.json();
       const veiculosData = veics ?? [];
@@ -79,12 +81,40 @@ export default function DocumentosPage() {
   function abrirForm(doc?: Documento) {
     if (doc) {
       setEditando(doc);
-      setForm({ veiculo_id: doc.veiculo_id, tipo: doc.tipo, numero: doc.numero ?? '', data_vencimento: doc.data_vencimento ?? '', observacao: doc.observacao ?? '' });
+      setForm({
+        veiculo_id: doc.veiculo_id,
+        tipo: doc.tipo,
+        numero: doc.numero ?? '',
+        data_vencimento: doc.data_vencimento ?? '',
+        observacao: doc.observacao ?? '',
+        url_anexo: doc.url_anexo ?? ''
+      });
     } else {
       setEditando(null);
-      setForm({ veiculo_id: '', tipo: 'CRLV', numero: '', data_vencimento: '', observacao: '' });
+      setForm({ veiculo_id: '', tipo: 'CRLV', numero: '', data_vencimento: '', observacao: '', url_anexo: '' });
     }
     setShowForm(true);
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const supabase = createClient();
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const filePath = `docs/${fileName}`;
+      const { error: uploadError } = await supabase.storage.from('fleetflow-storage').upload(filePath, file);
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from('fleetflow-storage').getPublicUrl(filePath);
+      setForm(f => ({ ...f, url_anexo: publicUrl }));
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao subir arquivo.');
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function salvar() {
@@ -94,7 +124,7 @@ export default function DocumentosPage() {
         method: editando ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editando
-          ? { id: editando.id, numero: form.numero, data_vencimento: form.data_vencimento, observacao: form.observacao }
+          ? { id: editando.id, numero: form.numero, data_vencimento: form.data_vencimento, observacao: form.observacao, url_anexo: form.url_anexo }
           : form),
       });
       const data = await res.json();
@@ -203,6 +233,12 @@ export default function DocumentosPage() {
                         {doc.data_vencimento && (
                           <span>Vence: {new Date(doc.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
                         )}
+                        {doc.url_anexo && (
+                          <a href={doc.url_anexo} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-brand-primary font-bold hover:underline">
+                            <Paperclip className="w-3 h-3" /> VER ANEXO
+                          </a>
+                        )}
                       </div>
                       {doc.observacao && (
                         <p className="text-xs text-gray-400 mt-1 truncate">{doc.observacao}</p>
@@ -262,14 +298,35 @@ export default function DocumentosPage() {
                   </div>
                 </div>
               )}
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tipo</label>
-                <div className="relative">
-                  <select className={inputCls + ' appearance-none pr-8'}
-                    value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}>
-                    {TIPOS_DOC.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2.5 top-3 pointer-events-none" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tipo</label>
+                  <div className="relative">
+                    <select className={inputCls + ' appearance-none pr-8'}
+                      value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}>
+                      {TIPOS_DOC.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2.5 top-3 pointer-events-none" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Anexo (Foto/PDF)</label>
+                  <label className={`flex items-center justify-center gap-2 ${inputCls} cursor-pointer hover:bg-gray-100 transition-colors`}>
+                    <input type="file" className="hidden" onChange={handleFileUpload} accept="image/*,application/pdf" />
+                    {uploading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : form.url_anexo ? (
+                      <>
+                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                        <span className="text-emerald-600 font-bold">Pronto</span>
+                      </>
+                    ) : (
+                      <>
+                        <Paperclip className="w-5 h-5 text-gray-400" />
+                        <span className="text-gray-400">Subir</span>
+                      </>
+                    )}
+                  </label>
                 </div>
               </div>
               <div>
@@ -293,7 +350,7 @@ export default function DocumentosPage() {
                 className="flex-1 py-3 rounded-2xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
                 Cancelar
               </button>
-              <button onClick={salvar} disabled={salvando || (!editando && !form.veiculo_id)}
+              <button onClick={salvar} disabled={salvando || uploading || (!editando && !form.veiculo_id)}
                 className="flex-1 py-3 rounded-2xl bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary/90 transition-colors disabled:opacity-50 shadow-lg shadow-brand-primary/20">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>
