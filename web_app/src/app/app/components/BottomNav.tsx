@@ -53,15 +53,15 @@ export default function BottomNav({ notifCount = 0 }: { notifCount?: number }) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-0.5 px-3 py-2.5 transition-colors relative ${
+              className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors relative ${
                 active ? 'text-indigo-600' : 'text-gray-400'
               }`}
             >
-              <Icon className="w-5 h-5" strokeWidth={active ? 2.5 : 1.8} />
+              <Icon className="w-6 h-6" strokeWidth={active ? 2.5 : 2} />
               {item.key === 'notificacoes' && notifCount > 0 && (
-                <span className="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-full border border-white" />
+                <span className="absolute top-2 right-1/4 w-2 h-2 bg-red-500 rounded-full border border-white" />
               )}
-              <span className={`text-[10px] font-medium ${active ? 'font-semibold' : ''}`}>
+              <span className={`text-[11px] font-medium leading-none ${active ? 'font-bold' : ''}`}>
                 {item.label}
               </span>
             </Link>
