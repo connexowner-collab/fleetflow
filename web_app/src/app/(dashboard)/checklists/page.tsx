@@ -4,12 +4,28 @@ import { useState, useEffect } from 'react';
 import {
   Search, AlertTriangle, CheckCircle2, Clock, Car, User, Camera,
   ClipboardCheck, X, FileSignature, AlertOctagon, ChevronRight,
+  Plus, Send, XCircle, Users,
 } from 'lucide-react';
 
 type ChecklistItem = { nome: string; conforme: boolean };
 type ChecklistFoto = { tipo: string; url: string };
 
 type ValidarModal = { inspection: Inspection; obs: string; submitting: boolean } | null;
+
+type Solicitacao = {
+  id: string;
+  motorista_id: string;
+  solicitante_nome: string;
+  placa: string | null;
+  mensagem: string | null;
+  created_at: string;
+  atendido_em: string | null;
+  profiles: { nome: string; email: string } | null;
+};
+
+type MotoristaDrop = { id: string; nome: string; email: string; placa_vinculada: string | null };
+
+type SolicitarModal = { open: boolean; motorista_id: string; mensagem: string; submitting: boolean };
 
 type Inspection = {
   id: string; id_real: string; motorista: string; placa: string;
@@ -38,6 +54,9 @@ export default function ChecklistsPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('Todos');
   const [validarModal, setValidarModal] = useState<ValidarModal>(null);
+  const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
+  const [motoristas, setMotoristas] = useState<MotoristaDrop[]>([]);
+  const [solicitarModal, setSolicitarModal] = useState<SolicitarModal>({ open: false, motorista_id: '', mensagem: '', submitting: false });
 
   const fetchInspections = async () => {
     try {
@@ -59,7 +78,71 @@ export default function ChecklistsPage() {
     } catch { setInspections([]); }
   };
 
-  useEffect(() => { fetchInspections(); }, []);
+  const fetchSolicitacoes = async () => {
+    try {
+      const res = await fetch('/api/admin/checklist-solicitacao');
+      if (!res.ok) return;
+      const json = await res.json();
+      setSolicitacoes((json.solicitacoes ?? []).filter((s: Solicitacao) => !s.atendido_em));
+    } catch { /* ignore */ }
+  };
+
+  const fetchMotoristasForSolicit = async () => {
+    if (motoristas.length) return;
+    try {
+      const res = await fetch('/api/admin/users');
+      if (!res.ok) return;
+      const json = await res.json();
+      const list = (json.users ?? []).filter((u: { perfil: string; ativo: boolean }) => u.perfil === 'motorista' && u.ativo !== false);
+      setMotoristas(list.map((u: { id: string; nome: string; email: string; placa_vinculada: string | null }) => ({
+        id: u.id, nome: u.nome, email: u.email, placa_vinculada: u.placa_vinculada ?? null,
+      })));
+    } catch { /* ignore */ }
+  };
+
+  const handleOpenSolicitar = async () => {
+    await fetchMotoristasForSolicit();
+    setSolicitarModal({ open: true, motorista_id: '', mensagem: '', submitting: false });
+  };
+
+  const handleSubmitSolicitar = async () => {
+    if (!solicitarModal.motorista_id) return;
+    setSolicitarModal(m => ({ ...m, submitting: true }));
+    const motorista = motoristas.find(m => m.id === solicitarModal.motorista_id);
+    try {
+      const res = await fetch('/api/admin/checklist-solicitacao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          motorista_id: solicitarModal.motorista_id,
+          placa: motorista?.placa_vinculada ?? null,
+          mensagem: solicitarModal.mensagem.trim() || null,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setSolicitarModal({ open: false, motorista_id: '', mensagem: '', submitting: false });
+      await fetchSolicitacoes();
+      showToast(`✅ Checklist solicitado para ${motorista?.nome ?? 'motorista'}`);
+    } catch {
+      setSolicitarModal(m => ({ ...m, submitting: false }));
+      showToast('⚠️ Erro ao solicitar checklist.');
+    }
+  };
+
+  const handleCancelarSolicitacao = async (id: string, motoristaNome: string) => {
+    try {
+      const res = await fetch('/api/admin/checklist-solicitacao', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) throw new Error();
+      setSolicitacoes(prev => prev.filter(s => s.id !== id));
+      showToast(`Solicitação para ${motoristaNome} cancelada.`);
+    } catch { showToast('⚠️ Erro ao cancelar solicitação.'); }
+  };
+
+  useEffect(() => { fetchInspections(); fetchSolicitacoes(); }, []);
 
   const handleSelectInspection = async (insp: Inspection) => {
     setSelectedInspection(insp);
@@ -210,9 +293,18 @@ export default function ChecklistsPage() {
       )}
 
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-black text-gray-900 tracking-tight">Checklists</h1>
-        <p className="text-sm text-gray-400 mt-0.5">Inspeções diárias enviadas pelo app do motorista</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Checklists</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Inspeções diárias enviadas pelo app do motorista</p>
+        </div>
+        <button
+          onClick={handleOpenSolicitar}
+          className="flex items-center gap-1.5 px-4 py-2 bg-brand-primary text-white text-xs font-bold rounded-xl shadow-md shadow-brand-primary/20 hover:bg-brand-primary/90 transition-colors shrink-0"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Solicitar Checklist
+        </button>
       </div>
 
       {/* Métricas */}
@@ -230,6 +322,39 @@ export default function ChecklistsPage() {
           <p className="text-xs text-emerald-500 font-semibold mt-0.5">Aprovados</p>
         </div>
       </div>
+
+      {/* Solicitações Pendentes (CA-34) */}
+      {solicitacoes.length > 0 && (
+        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 space-y-2">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="w-4 h-4 text-indigo-600" />
+            <p className="text-xs font-black text-indigo-700 uppercase tracking-wide">
+              Solicitações Pendentes ({solicitacoes.length})
+            </p>
+          </div>
+          {solicitacoes.map(s => {
+            const motoristaNome = s.profiles?.nome ?? 'Motorista';
+            return (
+              <div key={s.id} className="bg-white rounded-xl px-4 py-3 flex items-center justify-between shadow-sm border border-indigo-100">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-gray-900 truncate">{motoristaNome}</p>
+                  <p className="text-xs text-gray-400">
+                    {s.placa && <span className="font-semibold">{s.placa} · </span>}
+                    Solicitado por {s.solicitante_nome} em {new Date(s.created_at).toLocaleDateString('pt-BR')}
+                  </p>
+                  {s.mensagem && <p className="text-xs text-gray-500 italic mt-0.5 truncate">"{s.mensagem}"</p>}
+                </div>
+                <button
+                  onClick={() => handleCancelarSolicitacao(s.id, motoristaNome)}
+                  className="ml-3 shrink-0 flex items-center gap-1 text-[10px] font-bold text-red-600 border border-red-200 bg-red-50 px-2.5 py-1.5 rounded-lg hover:bg-red-100 transition-colors"
+                >
+                  <XCircle className="w-3 h-3" />Cancelar
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative">
@@ -321,6 +446,80 @@ export default function ChecklistsPage() {
           )}
         </div>
       </div>
+
+      {/* Modal — Solicitar Novo Checklist (CA-33) */}
+      {solicitarModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !solicitarModal.submitting && setSolicitarModal(m => ({ ...m, open: false }))} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-brand-primary/10 rounded-xl flex items-center justify-center">
+                <ClipboardCheck className="w-5 h-5 text-brand-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-gray-900">Solicitar Checklist</h3>
+                <p className="text-sm text-gray-400">O motorista receberá um pop-up obrigatório no APP.</p>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Motorista <span className="text-red-500">*</span>
+              </label>
+              {motoristas.length === 0 ? (
+                <div className="mt-1.5 flex items-center gap-2 text-sm text-gray-400 py-2">
+                  <div className="w-4 h-4 border-2 border-gray-300 border-t-brand-primary rounded-full animate-spin" />
+                  Carregando motoristas...
+                </div>
+              ) : (
+                <select
+                  value={solicitarModal.motorista_id}
+                  onChange={e => setSolicitarModal(m => ({ ...m, motorista_id: e.target.value }))}
+                  className="mt-1.5 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/20 bg-white"
+                >
+                  <option value="">Selecione um motorista...</option>
+                  {motoristas.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.nome}{m.placa_vinculada ? ` — ${m.placa_vinculada}` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Mensagem <span className="text-gray-400 font-normal normal-case">(opcional)</span>
+              </label>
+              <textarea
+                rows={2}
+                placeholder="Ex: Verificar pneus antes da saída..."
+                value={solicitarModal.mensagem}
+                onChange={e => setSolicitarModal(m => ({ ...m, mensagem: e.target.value }))}
+                className="mt-1.5 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/20 resize-none"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setSolicitarModal(m => ({ ...m, open: false }))}
+                disabled={solicitarModal.submitting}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSubmitSolicitar}
+                disabled={!solicitarModal.motorista_id || solicitarModal.submitting}
+                className="flex-1 py-2.5 rounded-xl bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary/90 disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                <Send className="w-4 h-4" />
+                {solicitarModal.submitting ? 'Enviando...' : 'Solicitar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
