@@ -5,6 +5,30 @@ import { Settings, Building, Bell, Shield, Save, CheckCircle, ClipboardList, Plu
 import { createClient } from '@/utils/supabase/client';
 import { applyBrandColor } from '@/utils/brand';
 
+async function fetchOpcoes() {
+  const res = await fetch('/api/admin/config')
+  const json = await res.json()
+  return (json.opcoes ?? []) as { id: string; categoria: string; valor: string; ativo: boolean }[]
+}
+
+async function adicionarOpcaoAPI(categoria: string, valor: string) {
+  const res = await fetch('/api/admin/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ categoria, valor }),
+  })
+  return res.json()
+}
+
+async function removerOpcaoAPI(id: string) {
+  const res = await fetch('/api/admin/config', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  })
+  return res.json()
+}
+
 type Opcao = { id: string; valor: string; ativo: boolean };
 type Categoria = 'unidade' | 'setor' | 'area' | 'item_inspecao';
 
@@ -38,7 +62,7 @@ export default function ConfiguracoesPage() {
     const supabase = createClient();
 
     async function load() {
-      // Load tenant info
+      // Load tenant info via Supabase client (apenas leitura de dados públicos do tenant)
       const { data: tenant } = await supabase.from('tenants').select('*').single();
       if (tenant) {
         setEmpresa(tenant.nome ?? '');
@@ -47,18 +71,12 @@ export default function ConfiguracoesPage() {
         setCorPrimaria(tenant.cor_primaria ?? '#0056B3');
       }
 
-      // Load dropdown options
-      const { data: opcoes } = await supabase
-        .from('config_opcoes')
-        .select('id, categoria, valor, ativo')
-        .order('valor');
-
-      if (opcoes) {
-        setUnidades(opcoes.filter(o => o.categoria === 'unidade').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
-        setSetores(opcoes.filter(o => o.categoria === 'setor').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
-        setAreas(opcoes.filter(o => o.categoria === 'area').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
-        setItensInspecao(opcoes.filter(o => o.categoria === 'item_inspecao').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
-      }
+      // Load dropdown options via API (usa admin client, contorna RLS)
+      const opcoes = await fetchOpcoes();
+      setUnidades(opcoes.filter(o => o.categoria === 'unidade').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
+      setSetores(opcoes.filter(o => o.categoria === 'setor').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
+      setAreas(opcoes.filter(o => o.categoria === 'area').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
+      setItensInspecao(opcoes.filter(o => o.categoria === 'item_inspecao').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
       setLoadingOpcoes(false);
     }
 
@@ -80,33 +98,22 @@ export default function ConfiguracoesPage() {
     const valor = novaOpcao[cat].trim();
     if (!valor) return;
 
-    const supabase = createClient();
-    const { data: tenantRow } = await supabase.from('tenants').select('id').single();
-    if (!tenantRow) return;
+    const json = await adicionarOpcaoAPI(cat, valor);
+    if (json.error) { showToast(`⚠️ ${json.error}`); return; }
 
-    const { data, error } = await supabase
-      .from('config_opcoes')
-      .insert({ tenant_id: tenantRow.id, categoria: cat, valor })
-      .select('id, valor, ativo')
-      .single();
-
-    if (error) { showToast(`⚠️ ${error.message}`); return; }
-
-    const nova: Opcao = { id: data.id, valor: data.valor, ativo: data.ativo };
+    const nova: Opcao = { id: json.opcao.id, valor: json.opcao.valor, ativo: json.opcao.ativo };
     if (cat === 'unidade') setUnidades(prev => [...prev, nova].sort((a, b) => a.valor.localeCompare(b.valor)));
     if (cat === 'setor') setSetores(prev => [...prev, nova].sort((a, b) => a.valor.localeCompare(b.valor)));
     if (cat === 'area') setAreas(prev => [...prev, nova].sort((a, b) => a.valor.localeCompare(b.valor)));
     if (cat === 'item_inspecao') setItensInspecao(prev => [...prev, nova]);
 
     setNovaOpcao(prev => ({ ...prev, [cat]: '' }));
-    showToast(`✅ "${valor}" adicionado em ${cat === 'unidade' ? 'Unidades' : cat === 'setor' ? 'Setores' : 'Áreas'}!`);
+    showToast(`✅ "${valor}" adicionado!`);
   };
 
   const handleRemoverOpcao = async (cat: Categoria, id: string, valor: string) => {
-    const supabase = createClient();
-    const { error } = await supabase.from('config_opcoes').delete().eq('id', id);
-
-    if (error) { showToast(`⚠️ ${error.message}`); return; }
+    const json = await removerOpcaoAPI(id);
+    if (json.error) { showToast(`⚠️ ${json.error}`); return; }
 
     if (cat === 'unidade') setUnidades(prev => prev.filter(o => o.id !== id));
     if (cat === 'setor') setSetores(prev => prev.filter(o => o.id !== id));
