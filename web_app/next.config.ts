@@ -9,6 +9,9 @@ const withPWA = withSerwist({
 
 const nextConfig: NextConfig = {
   turbopack: {},
+  // Fix Next.js 16 streaming metadata hydration mismatch (MetadataWrapper <div hidden> bug).
+  // Forcing all UAs to use blocking metadata so server and client render identically.
+  htmlLimitedBots: /.*/,
   async headers() {
     return [
       {
