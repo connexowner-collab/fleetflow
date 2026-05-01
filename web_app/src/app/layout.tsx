@@ -28,6 +28,9 @@ export const metadata: Metadata = {
   icons: {
     apple: '/icons/icon-192x192.png',
   },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
 };
 
 export const viewport: Viewport = {
@@ -44,15 +47,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
-      <head>
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="FleetFlow" />
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-        <link rel="manifest" href="/manifest.json" />
-      </head>
+    <html lang="pt-BR" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen w-screen overflow-hidden`}>
         <PWARegister />
         <InstallPWA />
