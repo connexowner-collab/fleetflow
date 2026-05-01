@@ -2,10 +2,13 @@ import { NextResponse, NextRequest } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getSessionFromRequest, canManageFleet } from '@/utils/auth/session'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = createAdminClient()
+  const { searchParams } = new URL(request.url)
+  const id = searchParams.get('id')
+
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('veiculos')
       .select(`
         id, placa, modelo, marca, tipo, capacidade, combustivel, cor,
@@ -14,7 +17,14 @@ export async function GET() {
         profiles!motorista_id(nome)
       `)
       .is('deleted_at', null)
-      .order('placa', { ascending: true })
+
+    if (id) {
+      query = query.eq('id', id)
+    } else {
+      query = query.order('placa', { ascending: true })
+    }
+
+    const { data, error } = await query
 
     if (error) throw error
 

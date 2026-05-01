@@ -7,6 +7,7 @@ import {
   ChevronDown, Calendar, Save, ExternalLink
 } from 'lucide-react';
 import { useCurrentUser, canDeleteVehicle, canManageFleet } from '@/hooks/useCurrentUser';
+import { useRouter } from 'next/navigation';
 
 // ── Tipos ─────────────────────────────────────────────────
 
@@ -137,6 +138,7 @@ function calcDocStatus(docs: { data_vencimento: string | null }[]): DocStatus {
 
 export default function FleetPage() {
   const currentUser = useCurrentUser()
+  const router = useRouter()
   const userPerfil = currentUser?.perfil ?? 'motorista'
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [filiais, setFiliais] = useState<string[]>([])
@@ -581,7 +583,11 @@ export default function FleetPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filtered.map(v => (
-                  <tr key={v.id} className="hover:bg-gray-50/40 transition-colors">
+                  <tr key={v.id} 
+                    onDoubleClick={() => router.push(`/frota/${v.id}`)}
+                    className="hover:bg-gray-50/40 transition-colors cursor-pointer"
+                    title="Clique duplo para ver detalhes"
+                  >
                     {/* Veículo */}
                     <td className="px-6 py-4">
                       <div className="flex items-center">
