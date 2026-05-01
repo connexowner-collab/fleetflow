@@ -754,6 +754,9 @@ export default function UserProfilePanel({ open, onClose }: UserProfilePanelProp
   const user = useCurrentUser();
   const [view, setView] = useState<View>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   // Carrega avatar ao abrir o painel
   useEffect(() => {
@@ -765,9 +768,9 @@ export default function UserProfilePanel({ open, onClose }: UserProfilePanelProp
     }
   }, [open]);
 
-  const nomeCurto   = user?.nome || user?.email || 'Usuário';
+  const nomeCurto   = mounted ? (user?.nome || user?.email || 'Usuário') : 'Usuário';
   const iniciais    = nomeCurto.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
-  const perfilLabel = PERFIL_LABEL[user?.perfil ?? ''] ?? (user?.perfil ?? '—');
+  const perfilLabel = mounted ? (PERFIL_LABEL[user?.perfil ?? ''] ?? (user?.perfil ?? '—')) : '—';
 
   // Fecha sub-tela ao fechar o painel
   const handleClose = useCallback(() => { setView(null); onClose(); }, [onClose]);
@@ -823,7 +826,7 @@ export default function UserProfilePanel({ open, onClose }: UserProfilePanelProp
             <div>
               <p className="text-sm font-semibold text-gray-800">{nomeCurto}</p>
               <p className="text-xs text-brand-primary font-medium">FleetFlow</p>
-              <p className="text-xs text-gray-400 mt-0.5">{user?.email || '—'}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{mounted ? (user?.email || '—') : '—'}</p>
             </div>
           </div>
           <div className="mt-3 inline-flex items-center px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">

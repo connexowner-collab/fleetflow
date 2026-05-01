@@ -22,6 +22,10 @@ export default function InstallPWA() {
       return
     }
 
+    // Usuário já dispensou ou instalou anteriormente — não mostrar novamente
+    const jaDispensado = localStorage.getItem('pwa-install-dismissed')
+    if (jaDispensado) return
+
     const handler = (e: Event) => {
       e.preventDefault()
       setPrompt(e as BeforeInstallPromptEvent)
@@ -30,6 +34,7 @@ export default function InstallPWA() {
 
     window.addEventListener('beforeinstallprompt', handler)
     window.addEventListener('appinstalled', () => {
+      localStorage.setItem('pwa-install-dismissed', 'true')
       setInstalado(true)
       setMostrar(false)
     })
@@ -66,7 +71,10 @@ export default function InstallPWA() {
           Instalar
         </button>
         <button
-          onClick={() => setMostrar(false)}
+          onClick={() => {
+            localStorage.setItem('pwa-install-dismissed', 'true')
+            setMostrar(false)
+          }}
           className="text-slate-500 hover:text-slate-300 p-1"
         >
           <X className="w-4 h-4" />
