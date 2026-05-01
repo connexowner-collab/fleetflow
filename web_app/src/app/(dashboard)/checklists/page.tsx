@@ -400,16 +400,19 @@ function PanelContent({ insp, itens, fotos, loadingDetail, conformes, naoConform
       {/* Actions */}
       <div className="border-t border-gray-100 p-4 space-y-2 bg-white shrink-0">
         <div className="flex gap-2">
-          <button onClick={() => onRecusar(insp)} disabled={insp.status !== 'Pendente'}
+          <button onClick={() => onRecusar(insp)}
+            disabled={!['Com Pendências', 'Pendente'].includes(insp.status)}
             className="flex-1 py-3 rounded-2xl border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
             Recusar
           </button>
-          <button onClick={() => onAprovar(insp)} disabled={insp.status !== 'Pendente'}
+          <button onClick={() => onAprovar(insp)}
+            disabled={!['Com Pendências', 'Pendente'].includes(insp.status)}
             className="flex-1 py-3 rounded-2xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
             Aprovar
           </button>
         </div>
-        <button onClick={() => onValidar(insp)} disabled={insp.status !== 'Pendente'}
+        <button onClick={() => onValidar(insp)}
+          disabled={insp.status !== 'Com Pendências'}
           className="w-full py-3 rounded-2xl bg-brand-primary text-white text-xs font-bold hover:bg-brand-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-brand-primary/20">
           <CheckCircle2 className="w-4 h-4" />Validar e Liberar
         </button>
