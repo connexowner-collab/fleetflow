@@ -22,7 +22,7 @@ export async function GET(
         .select(`
           id, placa, modelo, marca, tipo, capacidade, combustivel, cor,
           renavam, chassi, filial, ano_fabricacao, ano_modelo, km_atual, status, device_id,
-          profiles ( nome )
+          profiles!motorista_id ( nome )
         `)
         .eq('id', id)
         .single(),
