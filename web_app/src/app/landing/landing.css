@@ -31,7 +31,7 @@ body:has(.landing-root) {
   --ff-surface-2: #f8fafc;
   --ff-surface-3: #f1f5f9;
   --ff-border: #e2e8f0;
-  --ff-text: #0f172a;
+  --ff-text: #252526;
   --ff-text-2: #475569;
   --ff-text-3: #94a3b8;
 
@@ -625,7 +625,7 @@ body:has(.landing-root) {
   font-family: "Syne", sans-serif;
   font-size: 1.3rem;
   font-weight: 700;
-  color: #0f172a;
+  color: #252526;
 }
 
 .landing-mockup__card-label {

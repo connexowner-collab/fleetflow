@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, Search, User, Menu } from "lucide-react";
+import { Bell, Search, Menu } from "lucide-react";
 import UserProfilePanel from "./UserProfilePanel";
 import Link from "next/link";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -11,68 +12,142 @@ interface HeaderProps {
 
 export default function Header({ onMenuClick }: HeaderProps) {
   const [profileOpen, setProfileOpen] = useState(false);
-  const [naoLidas, setNaoLidas] = useState(0);
+  const [searchOpen, setSearchOpen]   = useState(false);
+  const [naoLidas, setNaoLidas]       = useState(0);
+  const [mounted, setMounted]         = useState(false);
+  const user = useCurrentUser();
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     async function fetchCount() {
       try {
-        const res = await fetch('/api/notificacoes?nao_lidas=true');
+        const res  = await fetch("/api/notificacoes?nao_lidas=true");
         const json = await res.json();
         setNaoLidas(json.count_nao_lidas ?? 0);
       } catch { /* ignore */ }
     }
     fetchCount();
-    const interval = setInterval(fetchCount, 60000);
+    const interval = setInterval(fetchCount, 60_000);
     return () => clearInterval(interval);
   }, []);
 
+  /* Initials avatar */
+  const nome    = mounted ? (user?.nome || user?.email || "U") : "U";
+  const initials = nome
+    .split(" ")
+    .map((p: string) => p[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
   return (
     <>
-      <header className="h-16 md:h-20 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 w-full">
-        <div className="flex items-center gap-3">
-          {/* Hamburger mobile */}
-          <button
-            onClick={onMenuClick}
-            className="md:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
-            aria-label="Abrir menu"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+      {/* ── Top App Bar ─────────────────────────────────────────── */}
+      <header className="sticky top-0 z-30 h-16 w-full bg-white/90 backdrop-blur-xl border-b border-gray-100 shadow-sm">
+        <div className="flex items-center justify-between h-full px-4 md:px-8 max-w-full">
 
-          {/* Search bar */}
-          <div className="flex items-center bg-gray-100 rounded-full px-4 py-2 w-48 sm:w-72 md:w-96 focus-within:ring-2 focus-within:ring-brand-primary">
-            <Search className="w-4 h-4 md:w-5 md:h-5 text-gray-400 mr-2 shrink-0" />
-            <input
-              type="text"
-              placeholder="Buscar..."
-              className="bg-transparent border-none outline-none w-full text-sm text-gray-700 placeholder-gray-500"
-            />
+          {/* LEFT — hamburger (desktop) + logo mobile */}
+          <div className="flex items-center gap-3">
+            {/* Hamburger — sidebar desktop */}
+            <button
+              onClick={onMenuClick}
+              className="hidden md:flex p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all duration-200"
+              aria-label="Toggle sidebar"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            {/* Logo — visible only on mobile (sidebar hidden) */}
+            <Link
+              href="/"
+              className="md:hidden flex items-center gap-2 select-none"
+            >
+              <div className="w-8 h-8 overflow-hidden">
+                <img
+                  src="/logo_v3.png"
+                  alt="FleetFlow"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <span className="text-base font-black tracking-tighter uppercase italic text-gray-900">
+                Fleet<span className="text-brand-secondary">Flow</span>
+              </span>
+            </Link>
+          </div>
+
+          {/* CENTER — search bar (desktop) */}
+          <div className="hidden md:flex flex-1 mx-8 max-w-md">
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Buscar..."
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary/40 transition-all"
+              />
+            </div>
+          </div>
+
+          {/* RIGHT — search icon mobile + bell + avatar */}
+          <div className="flex items-center gap-1 md:gap-3">
+
+            {/* Search — mobile icon */}
+            <button
+              className="md:hidden p-2 rounded-xl text-gray-400 hover:bg-gray-100 transition-colors"
+              onClick={() => setSearchOpen(v => !v)}
+              aria-label="Buscar"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+
+            {/* Notification bell */}
+            <Link
+              href="/notificacoes"
+              className="relative p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all duration-200"
+            >
+              <Bell className="w-5 h-5" />
+              {naoLidas > 0 && (
+                <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 bg-red-500 border-2 border-white rounded-full flex items-center justify-center text-white text-[9px] font-bold px-0.5 leading-none">
+                  {naoLidas > 99 ? "99+" : naoLidas}
+                </span>
+              )}
+            </Link>
+
+            {/* Avatar */}
+            <button
+              onClick={() => setProfileOpen(true)}
+              className="flex items-center gap-2.5 pl-1 md:pl-3 md:border-l md:border-gray-100 cursor-pointer group"
+              aria-label="Perfil do usuário"
+            >
+              <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-gradient-to-br from-brand-primary to-brand-primary/70 flex items-center justify-center text-white text-xs font-bold shrink-0 ring-2 ring-white shadow-sm group-hover:ring-brand-primary/30 transition-all">
+                {mounted ? initials : "—"}
+              </div>
+              <div className="hidden md:block text-left">
+                <p className="text-sm font-semibold text-gray-800 leading-tight">
+                  {mounted ? (user?.nome?.split(" ")[0] ?? "Usuário") : "—"}
+                </p>
+                <p className="text-xs text-brand-primary capitalize leading-tight">
+                  {mounted ? (user?.perfil ?? "—") : "—"}
+                </p>
+              </div>
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center space-x-3 md:space-x-6">
-          <Link href="/notificacoes" className="relative text-gray-500 hover:text-brand-primary transition-colors">
-            <Bell className="w-5 h-5 md:w-6 md:h-6" />
-            {naoLidas > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 border-2 border-white rounded-full flex items-center justify-center text-white text-[10px] font-bold px-0.5">
-                {naoLidas > 99 ? '99+' : naoLidas}
-              </span>
-            )}
-          </Link>
-
-          <button
-            onClick={() => setProfileOpen(true)}
-            className="flex items-center space-x-2 md:space-x-3 md:border-l md:border-gray-200 md:pl-6 cursor-pointer hover:opacity-80 transition-opacity"
-          >
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-brand-primary/20 rounded-full flex items-center justify-center text-brand-primary font-bold">
-              <User className="w-4 h-4 md:w-5 md:h-5" />
+        {/* Mobile search expandable */}
+        {searchOpen && (
+          <div className="md:hidden px-4 pb-3 bg-white/90 backdrop-blur-xl border-b border-gray-100">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <input
+                autoFocus
+                type="text"
+                placeholder="Buscar..."
+                className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary/40 transition-all"
+              />
             </div>
-            <div className="hidden md:block text-left">
-              <p className="text-sm font-semibold text-gray-800">João Gestor</p>
-              <p className="text-xs text-brand-primary">ViaCargas Transportes</p>
-            </div>
-          </button>
-        </div>
+          </div>
+        )}
       </header>
 
       <UserProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
