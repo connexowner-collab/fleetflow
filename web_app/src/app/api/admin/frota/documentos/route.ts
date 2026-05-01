@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('veiculo_documentos')
-    .select('id, tipo, numero, data_vencimento, observacao, url_anexo')
+    .select('id, tipo, data_vencimento, observacao, url_anexo')
     .eq('veiculo_id', veiculo_id)
     .order('tipo')
 
@@ -31,14 +31,13 @@ export async function PATCH(request: NextRequest) {
 
   const supabase = createAdminClient()
   const body = await request.json()
-  const { id, numero, data_vencimento, observacao, url_anexo } = body
+  const { id, data_vencimento, observacao, url_anexo } = body
 
   if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 })
 
   const { error } = await supabase
     .from('veiculo_documentos')
     .update({
-      numero: numero || null,
       data_vencimento: data_vencimento || null,
       observacao: observacao || null,
       url_anexo: url_anexo || null,
@@ -59,7 +58,7 @@ export async function POST(request: NextRequest) {
 
   const supabase = createAdminClient()
   const body = await request.json()
-  const { veiculo_id, tipo, numero, data_vencimento, observacao, url_anexo } = body
+  const { veiculo_id, tipo, data_vencimento, observacao, url_anexo } = body
 
   if (!veiculo_id || !tipo) {
     return NextResponse.json({ error: 'veiculo_id e tipo são obrigatórios' }, { status: 400 })
@@ -81,7 +80,6 @@ export async function POST(request: NextRequest) {
         tenant_id: userProfile.tenant_id,
         veiculo_id,
         tipo,
-        numero: numero || null,
         data_vencimento: data_vencimento || null,
         observacao: observacao || null,
         url_anexo: url_anexo || null,

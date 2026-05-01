@@ -50,14 +50,14 @@ export default function DocumentosPage() {
   const [editando, setEditando] = useState<Documento | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [form, setForm] = useState({ veiculo_id: '', tipo: 'CRLV', numero: '', data_vencimento: '', observacao: '', url_anexo: '' });
+  const [form, setForm] = useState({ veiculo_id: '', tipo: 'CRLV', data_vencimento: '', observacao: '', url_anexo: '' });
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const supabase = createClient();
       const { data: docs } = await supabase.from('veiculo_documentos')
-        .select('id, veiculo_id, tipo, numero, data_vencimento, observacao, url_anexo').order('tipo');
+        .select('id, veiculo_id, tipo, data_vencimento, observacao, url_anexo').order('tipo');
       const res = await fetch('/api/admin/frota');
       const { veiculos: veics } = await res.json();
       const veiculosData = veics ?? [];
@@ -84,14 +84,13 @@ export default function DocumentosPage() {
       setForm({
         veiculo_id: doc.veiculo_id,
         tipo: doc.tipo,
-        numero: doc.numero ?? '',
         data_vencimento: doc.data_vencimento ?? '',
         observacao: doc.observacao ?? '',
         url_anexo: doc.url_anexo ?? ''
       });
     } else {
       setEditando(null);
-      setForm({ veiculo_id: '', tipo: 'CRLV', numero: '', data_vencimento: '', observacao: '', url_anexo: '' });
+      setForm({ veiculo_id: '', tipo: 'CRLV', data_vencimento: '', observacao: '', url_anexo: '' });
     }
     setShowForm(true);
   }
@@ -124,7 +123,7 @@ export default function DocumentosPage() {
         method: editando ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editando
-          ? { id: editando.id, numero: form.numero, data_vencimento: form.data_vencimento, observacao: form.observacao, url_anexo: form.url_anexo }
+          ? { id: editando.id, data_vencimento: form.data_vencimento, observacao: form.observacao, url_anexo: form.url_anexo }
           : form),
       });
       const data = await res.json();
@@ -229,7 +228,6 @@ export default function DocumentosPage() {
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary">{doc.tipo}</span>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
-                        {doc.numero && <span className="font-mono">{doc.numero}</span>}
                         {doc.data_vencimento && (
                           <span>Vence: {new Date(doc.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
                         )}
@@ -328,11 +326,6 @@ export default function DocumentosPage() {
                     )}
                   </label>
                 </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Número / Protocolo</label>
-                <input type="text" className={inputCls} value={form.numero}
-                  onChange={e => setForm(f => ({ ...f, numero: e.target.value }))} />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Data de Vencimento</label>
