@@ -17,7 +17,28 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const user = useCurrentUser();
   const perfil = user?.perfil ?? 'motorista';
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  const [menuConfig, setMenuConfig] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setMounted(true);
+    async function loadMenuConfig() {
+      try {
+        const res = await fetch('/api/admin/config?categoria=menu&all=true');
+        const json = await res.json();
+        const config: Record<string, boolean> = {};
+        (json.opcoes ?? []).forEach((opt: any) => {
+          config[opt.valor] = opt.ativo;
+        });
+        setMenuConfig(config);
+      } catch (err) {
+        console.error('Erro ao carregar menu config:', err);
+      }
+    }
+    loadMenuConfig();
+
+    window.addEventListener('fleetflow:menu-updated', loadMenuConfig);
+    return () => window.removeEventListener('fleetflow:menu-updated', loadMenuConfig);
+  }, []);
 
   function goHome() {
     onClose();
@@ -40,7 +61,13 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     { href: '/configuracoes', label: 'Configurações', icon: Settings, roles: ['gestor', 'diretor'] },
   ];
 
-  const navItems = allNavItems.filter(item => item.roles.includes(perfil));
+  const navItems = allNavItems.filter(item => {
+    const isAllowedByRole = item.roles.includes(perfil);
+    // Se o item estiver na config do menu, respeita o status 'ativo'
+    // Se não estiver (ainda não inicializado), mostra por padrão
+    const isVisibleByConfig = menuConfig[item.label] !== false;
+    return isAllowedByRole && isVisibleByConfig;
+  });
 
   return (
     <>

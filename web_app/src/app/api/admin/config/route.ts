@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
   if (!tenantId) return NextResponse.json({ opcoes: [] })
 
   const { searchParams } = new URL(request.url)
+  const all = searchParams.get('all') === 'true'
   const categoria = searchParams.get('categoria')
 
   const supabase = createAdminClient()
@@ -30,8 +31,9 @@ export async function GET(request: NextRequest) {
     .from('config_opcoes')
     .select('id, categoria, valor, ativo')
     .eq('tenant_id', tenantId)
-    .eq('ativo', true)
     .order('valor')
+
+  if (!all) query = query.eq('ativo', true)
 
   if (categoria) query = query.eq('categoria', categoria)
 
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await getSessionFromRequest(request)
   if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
-  if (!['gestor', 'diretor', 'analista'].includes(session.perfil?.toLowerCase()))
+  if (!['gestor', 'diretor', 'analista', 'master'].includes(session.perfil?.toLowerCase()))
     return NextResponse.json({ error: 'Sem permissão.' }, { status: 403 })
 
   const tenantId = await getTenantId(session.email)
@@ -69,7 +71,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const session = await getSessionFromRequest(request)
   if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
-  if (!['gestor', 'diretor', 'analista'].includes(session.perfil?.toLowerCase()))
+  if (!['gestor', 'diretor', 'analista', 'master'].includes(session.perfil?.toLowerCase()))
     return NextResponse.json({ error: 'Sem permissão.' }, { status: 403 })
 
   const tenantId = await getTenantId(session.email)
@@ -88,4 +90,31 @@ export async function DELETE(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ ok: true })
+}
+
+export async function PATCH(request: NextRequest) {
+  const session = await getSessionFromRequest(request)
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+  if (!['gestor', 'diretor', 'analista', 'master'].includes(session.perfil?.toLowerCase()))
+    return NextResponse.json({ error: 'Sem permissão.' }, { status: 403 })
+
+  const tenantId = await getTenantId(session.email)
+  if (!tenantId) return NextResponse.json({ error: 'Tenant não encontrado.' }, { status: 404 })
+
+  const { id, ativo } = await request.json()
+  if (!id || ativo === undefined)
+    return NextResponse.json({ error: 'ID e status ativos são obrigatórios.' }, { status: 400 })
+
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('config_opcoes')
+    .update({ ativo })
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .select('id, categoria, valor, ativo')
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ opcao: data })
 }

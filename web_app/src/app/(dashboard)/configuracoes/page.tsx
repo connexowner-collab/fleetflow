@@ -1,18 +1,29 @@
 "use client";
 
+import React from 'react';
+
 import { useState, useEffect, useCallback } from 'react';
 import { Settings, Building, Bell, Shield, Save, CheckCircle, ClipboardList, Plus, Trash2, MapPin, Briefcase, Grid3X3, Wrench } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { applyBrandColor } from '@/utils/brand';
 
 type Opcao = { id: string; valor: string; ativo: boolean };
-type Categoria = 'unidade' | 'setor' | 'area' | 'item_inspecao';
+type Categoria = 'unidade' | 'setor' | 'area' | 'item_inspecao' | 'menu';
 
 /* ── API helpers ─────────────────────────────────────────────────────────── */
-async function fetchOpcoes() {
-  const res = await fetch('/api/admin/config');
+async function fetchOpcoes(all = false) {
+  const res = await fetch(`/api/admin/config${all ? '?all=true' : ''}`);
   const json = await res.json();
   return (json.opcoes ?? []) as { id: string; categoria: string; valor: string; ativo: boolean }[];
+}
+
+async function toggleOpcaoAPI(id: string, ativo: boolean) {
+  const res = await fetch('/api/admin/config', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, ativo }),
+  });
+  return res.json();
 }
 
 async function adicionarOpcaoAPI(categoria: string, valor: string) {
@@ -117,9 +128,10 @@ export default function ConfiguracoesPage() {
   const [unidades, setUnidades] = useState<Opcao[]>([]);
   const [setores, setSetores] = useState<Opcao[]>([]);
   const [areas, setAreas] = useState<Opcao[]>([]);
+  const [menus, setMenus] = useState<Opcao[]>([]);
   const [itensInspecao, setItensInspecao] = useState<Opcao[]>([]);
   const [novaOpcao, setNovaOpcao] = useState<Record<Categoria, string>>({
-    unidade: '', setor: '', area: '', item_inspecao: '',
+    unidade: '', setor: '', area: '', item_inspecao: '', menu: '',
   });
   const [loadingOpcoes, setLoadingOpcoes] = useState(true);
 
@@ -138,15 +150,55 @@ export default function ConfiguracoesPage() {
         setEmailContato(tenant.email ?? '');
         setCorPrimaria(tenant.cor_primaria ?? '#0056B3');
       }
-      const opcoes = await fetchOpcoes();
+      const opcoes = await fetchOpcoes(true);
       setUnidades(opcoes.filter(o => o.categoria === 'unidade').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
       setSetores(opcoes.filter(o => o.categoria === 'setor').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
       setAreas(opcoes.filter(o => o.categoria === 'area').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
+      setMenus(opcoes.filter(o => o.categoria === 'menu').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
       setItensInspecao(opcoes.filter(o => o.categoria === 'item_inspecao').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
       setLoadingOpcoes(false);
     }
     load();
   }, []);
+
+  const DEFAULT_MENUS = [
+    'Dashboard', 'Gestão da Frota', 'Checklists', 'Ocorrências', 'Manutenção',
+    'Combustível', 'Documentos', 'Rastreamento', 'Relatórios & BI', 'Notificações',
+    'Gestão de Acessos', 'Aprovações de Troca', 'Configurações'
+  ];
+
+  const handleToggleAtivo = async (id: string | null, cat: string, atual: boolean, valor?: string) => {
+    let targetId = id;
+
+    // Se não tem ID, significa que ainda não existe no banco (é um menu padrão novo)
+    if (!targetId && valor) {
+      const json = await adicionarOpcaoAPI('menu', valor);
+      if (json.error) { showToast(`⚠️ ${json.error}`); return; }
+      targetId = json.opcao.id;
+      // Por padrão ao criar via POST ele vem como ativo:true, então se o usuário
+      // clicou pra desativar algo que era "virtualmente" ativo, precisamos do PATCH
+      await toggleOpcaoAPI(targetId!, false);
+    } else if (targetId) {
+      const json = await toggleOpcaoAPI(targetId, !atual);
+      if (json.error) { showToast(`⚠️ ${json.error}`); return; }
+    }
+
+    // Refresh da lista de menus para refletir o ID e status real
+    const opcoes = await fetchOpcoes(true);
+    setMenus(opcoes.filter(o => o.categoria === 'menu').map(o => ({ id: o.id, valor: o.valor, ativo: o.ativo })));
+    
+    // Atualiza outras categorias se necessário
+    const update = (prev: Opcao[]) => prev.map(o => o.id === targetId ? { ...o, ativo: !atual } : o);
+    if (cat === 'unidade') setUnidades(update);
+    if (cat === 'setor') setSetores(update);
+    if (cat === 'area') setAreas(update);
+    if (cat === 'item_inspecao') setItensInspecao(update);
+
+    // Dispara evento para o Sidebar se atualizar
+    window.dispatchEvent(new CustomEvent('fleetflow:menu-updated'));
+
+    showToast(`✅ Status atualizado!`);
+  };
 
   const handleSalvarEmpresa = async () => {
     const supabase = createClient();
@@ -171,9 +223,10 @@ export default function ConfiguracoesPage() {
 
     const nova: Opcao = { id: json.opcao.id, valor: json.opcao.valor, ativo: json.opcao.ativo };
     const sort = (a: Opcao, b: Opcao) => a.valor.localeCompare(b.valor);
-    if (cat === 'unidade')      setUnidades(prev => [...prev, nova].sort(sort));
-    if (cat === 'setor')        setSetores(prev => [...prev, nova].sort(sort));
-    if (cat === 'area')         setAreas(prev => [...prev, nova].sort(sort));
+    if (cat === 'unidade') setUnidades(prev => [...prev, nova].sort(sort));
+    if (cat === 'setor') setSetores(prev => [...prev, nova].sort(sort));
+    if (cat === 'area') setAreas(prev => [...prev, nova].sort(sort));
+    if (cat === 'menu') setMenus(prev => [...prev, nova].sort(sort));
     if (cat === 'item_inspecao') setItensInspecao(prev => [...prev, nova]);
 
     setNovaOpcao(prev => ({ ...prev, [cat]: '' }));
@@ -184,9 +237,9 @@ export default function ConfiguracoesPage() {
     const json = await removerOpcaoAPI(id);
     if (json.error) { showToast(`⚠️ ${json.error}`); return; }
 
-    if (cat === 'unidade')      setUnidades(prev => prev.filter(o => o.id !== id));
-    if (cat === 'setor')        setSetores(prev => prev.filter(o => o.id !== id));
-    if (cat === 'area')         setAreas(prev => prev.filter(o => o.id !== id));
+    if (cat === 'unidade') setUnidades(prev => prev.filter(o => o.id !== id));
+    if (cat === 'setor') setSetores(prev => prev.filter(o => o.id !== id));
+    if (cat === 'area') setAreas(prev => prev.filter(o => o.id !== id));
     if (cat === 'item_inspecao') setItensInspecao(prev => prev.filter(o => o.id !== id));
 
     showToast(`🗑️ "${valor}" removido.`);
@@ -294,6 +347,12 @@ export default function ConfiguracoesPage() {
                 </label>
               ))}
             </div>
+            <div className="mt-6 flex justify-end">
+              <button onClick={() => showToast('✅ Preferências de notificação salvas!')}
+                className="bg-brand-primary hover:bg-brand-primary/90 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all">
+                <Save className="w-4 h-4" /> Salvar Notificações
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
@@ -321,6 +380,85 @@ export default function ConfiguracoesPage() {
                   <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold">Em breve</span>
                 </button>
               </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button onClick={() => showToast('✅ Configurações de segurança atualizadas!')}
+                className="bg-brand-primary hover:bg-brand-primary/90 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all">
+                <Save className="w-4 h-4" /> Salvar Segurança
+              </button>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <div className="p-2.5 bg-indigo-100 rounded-xl text-indigo-600 mr-3"><Briefcase className="w-5 h-5" /></div>
+                <h2 className="text-lg font-bold text-gray-900">Gerenciamento do Menu Lateral</h2>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-500 mb-6">
+              Ative ou desative os itens que aparecem no menu principal do sistema.
+              Novos itens podem ser adicionados, mas requerem implementação no código para funcionar.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {DEFAULT_MENUS.map(label => {
+                const dbMenu = menus.find(m => m.valor === label);
+                const isAtivo = dbMenu ? dbMenu.ativo : true; // Ativo por padrão se não estiver no banco
+                
+                return (
+                  <div key={label} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl bg-gray-50/50">
+                    <span className={`text-sm font-medium ${isAtivo ? 'text-gray-900' : 'text-gray-400'}`}>
+                      {label}
+                    </span>
+                    <button
+                      onClick={() => handleToggleAtivo(dbMenu?.id || null, 'menu', isAtivo, label)}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isAtivo ? 'bg-brand-primary' : 'bg-gray-200'}`}
+                    >
+                      <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${isAtivo ? 'translate-x-5' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                );
+              })}
+              
+              {/* Menus extras (cadastrados manualmente) */}
+              {menus.filter(m => !DEFAULT_MENUS.includes(m.valor)).map(menu => (
+                <div key={menu.id} className="flex items-center justify-between p-3 border border-indigo-50 rounded-xl bg-indigo-50/30">
+                  <span className={`text-sm font-medium ${menu.ativo ? 'text-indigo-900' : 'text-gray-400'}`}>
+                    {menu.valor}
+                  </span>
+                  <button
+                    onClick={() => handleToggleAtivo(menu.id, 'menu', menu.ativo, menu.valor)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${menu.ativo ? 'bg-indigo-500' : 'bg-gray-200'}`}
+                  >
+                    <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${menu.ativo ? 'translate-x-5' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex gap-2">
+              <input
+                type="text"
+                value={novaOpcao.menu}
+                onChange={e => handleInputChange('menu', e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAdicionar('menu')}
+                placeholder="Adicionar novo item de menu personalizado..."
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
+              />
+              <button
+                onClick={() => handleAdicionar('menu')}
+                disabled={!novaOpcao.menu.trim()}
+                className="px-4 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 disabled:opacity-40 transition-all flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="mt-6 flex justify-end border-t border-gray-50 pt-6">
+              <button onClick={() => showToast('✅ Configurações do menu salvas!')}
+                className="bg-brand-primary hover:bg-brand-primary/90 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all">
+                <Save className="w-4 h-4" /> Salvar Menu
+              </button>
             </div>
           </div>
         </>
@@ -362,12 +500,8 @@ export default function ConfiguracoesPage() {
         </>
       )}
 
-      <div className="pb-8 flex justify-end">
-        <button onClick={() => showToast('✅ Configurações salvas!')}
-          className="bg-brand-primary hover:bg-brand-primary/90 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-brand-primary/20 flex items-center gap-2 transition-all active:scale-95">
-          <CheckCircle className="w-5 h-5" /> Salvar Todas as Configurações
-        </button>
-      </div>
+
+      <div className="pb-8" />
     </div>
   );
 }

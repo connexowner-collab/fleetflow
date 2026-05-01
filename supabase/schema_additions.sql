@@ -7,7 +7,7 @@ ALTER TABLE public.checklists ADD COLUMN IF NOT EXISTS motorista_nome_display TE
 CREATE TABLE IF NOT EXISTS public.config_opcoes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  categoria TEXT NOT NULL CHECK (categoria IN ('unidade','setor','area')),
+  categoria TEXT NOT NULL CHECK (categoria IN ('unidade','setor','area','item_inspecao','menu')),
   valor TEXT NOT NULL,
   ativo BOOLEAN DEFAULT TRUE,
   criado_em TIMESTAMPTZ DEFAULT NOW(),
