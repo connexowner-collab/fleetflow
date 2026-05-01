@@ -4,12 +4,15 @@ import { getSessionFromRequest } from '@/utils/session'
 
 async function getTenantId(email: string) {
   const supabase = createAdminClient()
-  const { data } = await supabase
+  const { data: profile } = await supabase
     .from('profiles')
     .select('tenant_id')
     .eq('email', email)
     .single()
-  return data?.tenant_id ?? null
+  if (profile?.tenant_id) return profile.tenant_id
+  // Fallback: single-tenant system
+  const { data: tenant } = await supabase.from('tenants').select('id').single()
+  return tenant?.id ?? null
 }
 
 export async function GET(request: NextRequest) {
@@ -41,7 +44,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = getSessionFromRequest(request)
   if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
-  if (!['gestor', 'diretor', 'analista'].includes(session.perfil))
+  if (!['gestor', 'diretor', 'analista'].includes(session.perfil?.toLowerCase()))
     return NextResponse.json({ error: 'Sem permissão.' }, { status: 403 })
 
   const tenantId = await getTenantId(session.email)
@@ -66,7 +69,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const session = getSessionFromRequest(request)
   if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
-  if (!['gestor', 'diretor', 'analista'].includes(session.perfil))
+  if (!['gestor', 'diretor', 'analista'].includes(session.perfil?.toLowerCase()))
     return NextResponse.json({ error: 'Sem permissão.' }, { status: 403 })
 
   const tenantId = await getTenantId(session.email)
