@@ -347,26 +347,24 @@ export default function UsersManagement() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto relative pb-12">
+    <div className="max-w-7xl mx-auto space-y-5 pb-4">
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-[60] px-6 py-4 rounded-2xl shadow-2xl text-sm font-bold animate-in slide-in-from-right flex items-center gap-3 ${toast.type === 'error' ? 'bg-red-900 text-white' : 'bg-gray-900 text-white'}`}>
-          <div className={`w-2 h-2 rounded-full animate-pulse ${toast.type === 'error' ? 'bg-red-400' : 'bg-green-400'}`} /> {toast.msg}
+        <div className={`fixed top-20 right-4 z-[60] px-4 py-3 rounded-2xl shadow-2xl text-sm font-medium animate-in slide-in-from-right ${toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-gray-900 text-white'}`}>
+          {toast.msg}
         </div>
       )}
 
       {/* Header */}
-      <div className="flex justify-between items-end">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
-            <LayoutDashboard className="w-8 h-8 text-brand-primary" /> Gestão de Acessos
-          </h1>
-          <p className="text-gray-500 mt-2 font-medium">Controle quem acessa o dashboard e o aplicativo mobile.</p>
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Gestão de Acessos</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Controle quem acessa o dashboard e o aplicativo mobile.</p>
         </div>
         <button onClick={() => setModalCriar(true)} disabled={loading}
-          className="bg-brand-primary text-white px-6 py-3 rounded-xl flex items-center font-bold shadow-lg shadow-brand-primary/20 hover:-translate-y-0.5 transition-all disabled:opacity-50">
-          <Plus className="w-5 h-5 mr-2" /> Novo Acesso
+          className="flex items-center gap-1.5 bg-brand-primary text-white text-sm font-bold px-4 py-2.5 rounded-2xl shadow-lg shadow-brand-primary/25 hover:bg-brand-primary/90 active:scale-95 transition-all disabled:opacity-50">
+          <Plus className="w-4 h-4" /><span className="hidden sm:inline">Novo Acesso</span>
         </button>
       </div>
 
@@ -432,8 +430,38 @@ export default function UsersManagement() {
             </div>
           </div>
 
-          {/* Tabela */}
-          <div className="overflow-x-auto">
+          {/* Mobile cards */}
+          <div className="md:hidden divide-y divide-gray-50">
+            {filtered.length === 0 && (
+              <div className="p-12 text-center text-gray-400 text-sm">Nenhum usuário encontrado</div>
+            )}
+            {filtered.map(u => (
+              <div key={u.id} className="p-4 flex items-center gap-3">
+                <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(u.nome || u.email)}&background=0056B3&color=fff&bold=true`}
+                  alt="" className="w-10 h-10 rounded-xl object-cover shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-black text-gray-900 text-sm truncate">{u.nome || u.email}</span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${u.ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                      {u.ativo ? 'Ativo' : 'Inativo'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 truncate">{perfilLabel[u.perfil] ?? u.perfil}{u.filial ? ` · ${u.filial}` : ''}</p>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <button onClick={() => openEditar(u)} className="p-2 rounded-xl text-gray-400 hover:text-brand-primary hover:bg-brand-primary/10 transition-all">
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => setModalDeletar(u)} className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-sm text-gray-600">
               <thead className="bg-gray-50/70 text-gray-400 uppercase font-black text-[10px] tracking-widest">
                 <tr>

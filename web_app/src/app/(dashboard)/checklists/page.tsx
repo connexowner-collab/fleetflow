@@ -208,7 +208,7 @@ export default function ChecklistsPage() {
             const StatusIcon = sc.icon;
             const isSelected = selectedInspection?.id_real === insp.id_real;
             return (
-              <button key={insp.id_real} onClick={() => handleSelectInspection(isSelected ? null as unknown as Inspection : insp)}
+              <button key={insp.id_real} onClick={() => { if (isSelected) setSelectedInspection(null); else handleSelectInspection(insp); }}
                 className={`w-full text-left bg-white rounded-2xl border transition-all flex items-stretch overflow-hidden hover:shadow-md active:scale-[.99] ${
                   isSelected ? 'border-brand-primary ring-2 ring-brand-primary/10 shadow-md' : 'border-gray-100'
                 }`}>

@@ -113,12 +113,10 @@ export default function AuditoriaPage() {
   const ACOES_DISPONIVEIS = Object.keys(ACAO_LABEL).sort();
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="max-w-5xl mx-auto space-y-5 pb-4">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <Shield className="w-7 h-7 text-brand-primary" /> Log de Auditoria
-        </h1>
-        <p className="text-gray-500 text-sm mt-1">Histórico imutável de todas as ações do sistema</p>
+        <h1 className="text-2xl font-black text-gray-900 tracking-tight">Log de Auditoria</h1>
+        <p className="text-sm text-gray-400 mt-0.5">Histórico imutável de todas as ações do sistema</p>
       </div>
 
       {/* Filtros */}

@@ -420,11 +420,11 @@ export default function FleetPage() {
   // ── Render ─────────────────────────────────────────────
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-7xl mx-auto space-y-5 pb-4">
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-[100] px-5 py-3 rounded-xl shadow-2xl text-sm font-medium animate-in slide-in-from-right ${
+        <div className={`fixed top-20 right-4 z-[100] px-4 py-3 rounded-2xl shadow-2xl text-sm font-medium animate-in slide-in-from-right ${
           toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-gray-900 text-white'
         }`}>{toast.msg}</div>
       )}
@@ -432,10 +432,8 @@ export default function FleetPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center">
-            <Truck className="w-8 h-8 mr-3 text-brand-primary" />Gestão da Frota
-          </h1>
-          <p className="text-gray-500 mt-1">Cadastre, edite e monitore todos os veículos da operação.</p>
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Gestão da Frota</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Cadastre, edite e monitore todos os veículos da operação.</p>
         </div>
         {canManageFleet(userPerfil) && (
           <div className="flex gap-3">
@@ -461,12 +459,12 @@ export default function FleetPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {stats.map((s, i) => (
-          <div key={i} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center space-x-4">
-            <div className={`p-3 bg-gray-50 rounded-xl ${s.color}`}><s.icon className="w-6 h-6" /></div>
+          <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
+            <div className={`p-2.5 bg-gray-50 rounded-xl ${s.color} shrink-0`}><s.icon className="w-5 h-5" /></div>
             <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">{s.label}</p>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-tight">{s.label}</p>
               <p className="text-2xl font-black text-gray-900">{s.value}</p>
             </div>
           </div>
@@ -541,7 +539,33 @@ export default function FleetPage() {
             <p>{search ? `Nenhum resultado para "${search}"` : 'Nenhum veículo cadastrado.'}</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Mobile cards */}
+          <div className="md:hidden divide-y divide-gray-50">
+            {filtered.map(v => (
+              <div key={v.id} className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 bg-brand-primary/5 rounded-xl flex items-center justify-center shrink-0">
+                  <Truck className="w-5 h-5 text-brand-primary/60" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="font-black text-gray-900">{v.placa}</span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${statusStyles[v.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                      {v.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 truncate">{v.marca} {v.modelo}{v.ano_modelo ? ` · ${v.ano_modelo}` : ''}</p>
+                  <p className="text-xs text-gray-400 truncate">{v.filial ?? '—'}{v.profiles?.nome ? ` · ${v.profiles.nome}` : ''}</p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={() => setDetailVehicle(v)} className="p-2 text-gray-400 hover:text-brand-primary transition-colors"><Eye className="w-4 h-4" /></button>
+                  <button onClick={() => openEditar(v)} className="p-2 text-gray-400 hover:text-blue-600 transition-colors"><Pencil className="w-4 h-4" /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-gray-50/50 text-gray-400 text-xs font-black uppercase tracking-widest border-b border-gray-100">
@@ -636,6 +660,7 @@ export default function FleetPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

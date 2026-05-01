@@ -4,28 +4,17 @@ import { useState, useEffect, useCallback } from 'react';
 import { MapPin, Wifi, WifiOff, Zap, ZapOff, RefreshCw, Navigation, Plus, X, ChevronDown } from 'lucide-react';
 
 interface Posicao {
-  id: string;
-  veiculo_id: string;
-  veiculo_placa: string;
-  lat: number | null;
-  lng: number | null;
-  velocidade: number;
-  ignicao: boolean;
-  odometro: number;
-  status: 'online' | 'parado' | 'offline';
-  ultima_atualizacao: string;
+  id: string; veiculo_id: string; veiculo_placa: string;
+  lat: number | null; lng: number | null; velocidade: number; ignicao: boolean;
+  odometro: number; status: 'online' | 'parado' | 'offline'; ultima_atualizacao: string;
 }
 
-interface Veiculo {
-  id: string;
-  placa: string;
-  modelo: string;
-}
+interface Veiculo { id: string; placa: string; modelo: string }
 
 const STATUS_CONFIG = {
-  online:  { label: 'Online',  color: 'text-green-600 bg-green-50',  dot: 'bg-green-500' },
-  parado:  { label: 'Parado',  color: 'text-yellow-600 bg-yellow-50', dot: 'bg-yellow-500' },
-  offline: { label: 'Offline', color: 'text-gray-500 bg-gray-100',   dot: 'bg-gray-400' },
+  online:  { label: 'Em Rota',  color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500', border: 'border-emerald-100' },
+  parado:  { label: 'Parado',   color: 'bg-amber-100 text-amber-700',     dot: 'bg-amber-500',   border: 'border-amber-100'   },
+  offline: { label: 'Offline',  color: 'bg-gray-100 text-gray-500',       dot: 'bg-gray-400',    border: 'border-gray-100'    },
 };
 
 function formatarTempo(iso: string) {
@@ -35,6 +24,8 @@ function formatarTempo(iso: string) {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`;
   return new Date(iso).toLocaleDateString('pt-BR');
 }
+
+const inputCls = 'w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary transition-all';
 
 export default function RastreamentoPage() {
   const [posicoes, setPosicoes] = useState<Posicao[]>([]);
@@ -60,8 +51,6 @@ export default function RastreamentoPage() {
   useEffect(() => {
     fetch('/api/admin/veiculos').then(r => r.json()).then(j => setVeiculos(j.veiculos ?? []));
   }, []);
-
-  // Auto-refresh a cada 30 segundos
   useEffect(() => {
     const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
@@ -75,106 +64,109 @@ export default function RastreamentoPage() {
     setSalvando(true);
     const veiculo = veiculos.find(v => v.id === form.veiculo_id);
     await fetch('/api/admin/rastreamento', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        veiculo_id: form.veiculo_id,
-        veiculo_placa: veiculo?.placa ?? form.veiculo_placa,
-        lat: form.lat ? parseFloat(form.lat) : null,
-        lng: form.lng ? parseFloat(form.lng) : null,
-        velocidade: parseInt(form.velocidade),
-        ignicao: form.ignicao === 'true',
-        odometro: parseInt(form.odometro),
-        status: form.status,
+        veiculo_id: form.veiculo_id, veiculo_placa: veiculo?.placa ?? form.veiculo_placa,
+        lat: form.lat ? parseFloat(form.lat) : null, lng: form.lng ? parseFloat(form.lng) : null,
+        velocidade: parseInt(form.velocidade), ignicao: form.ignicao === 'true',
+        odometro: parseInt(form.odometro), status: form.status,
       }),
     });
-    setSalvando(false);
-    setShowForm(false);
-    load();
+    setSalvando(false); setShowForm(false); load();
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="max-w-5xl mx-auto space-y-5 pb-4">
+
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <MapPin className="w-7 h-7 text-brand-primary" /> Rastreamento
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">Posição e telemetria dos veículos em tempo real</p>
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Rastreamento</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Posição e telemetria dos veículos em tempo real</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={load} className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-colors font-medium">
-            <RefreshCw className="w-4 h-4" /> Atualizar
+          <button onClick={load}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors text-sm font-bold">
+            <RefreshCw className="w-4 h-4" />
+            <span className="hidden sm:inline">Atualizar</span>
           </button>
           <button onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 bg-brand-primary text-white px-4 py-2.5 rounded-lg hover:bg-brand-primary/90 transition-colors font-medium">
-            <Plus className="w-4 h-4" /> Atualizar Posição
+            className="flex items-center gap-1.5 bg-brand-primary text-white text-sm font-bold px-4 py-2.5 rounded-2xl shadow-lg shadow-brand-primary/25 hover:bg-brand-primary/90 active:scale-95 transition-all">
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Posição</span>
           </button>
         </div>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-green-50 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
-          <div>
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Em Rota</p>
-            <p className="text-3xl font-bold text-green-600">{online}</p>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <p className="text-xs text-emerald-600 font-bold">Em Rota</p>
           </div>
+          <p className="text-2xl font-black text-emerald-700">{online}</p>
         </div>
-        <div className="bg-yellow-50 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full bg-yellow-500 flex-shrink-0" />
-          <div>
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Parado</p>
-            <p className="text-3xl font-bold text-yellow-600">{parado}</p>
+        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-2 h-2 rounded-full bg-amber-500" />
+            <p className="text-xs text-amber-600 font-bold">Parado</p>
           </div>
+          <p className="text-2xl font-black text-amber-700">{parado}</p>
         </div>
-        <div className="bg-gray-50 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
-          <div>
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Offline</p>
-            <p className="text-3xl font-bold text-gray-500">{offline}</p>
+        <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-2 h-2 rounded-full bg-gray-400" />
+            <p className="text-xs text-gray-500 font-bold">Offline</p>
           </div>
+          <p className="text-2xl font-black text-gray-600">{offline}</p>
         </div>
       </div>
 
-      {/* Mapa placeholder + lista */}
+      {/* Map + list grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Mapa simulado */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-            <span className="text-sm font-semibold text-gray-700 flex items-center gap-2"><Navigation className="w-4 h-4" /> Mapa de Frota</span>
-            <span className="text-xs text-gray-400">Atualiza automaticamente a cada 30s</span>
+
+        {/* Map placeholder */}
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+            <span className="text-sm font-black text-gray-800 flex items-center gap-2">
+              <Navigation className="w-4 h-4 text-brand-primary" /> Mapa de Frota
+            </span>
+            <span className="text-[10px] text-gray-400 font-medium">Auto-atualiza a cada 30s</span>
           </div>
-          <div className="relative bg-slate-100 h-72 flex items-center justify-center overflow-hidden">
-            {/* Grade simulando mapa */}
-            <div className="absolute inset-0 opacity-20">
+
+          <div className="relative bg-slate-50 h-72 flex items-center justify-center overflow-hidden">
+            {/* Grid background */}
+            <div className="absolute inset-0 opacity-10">
               {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="absolute border-b border-slate-400" style={{ top: `${(i + 1) * 12.5}%`, left: 0, right: 0 }} />
+                <div key={`h${i}`} className="absolute border-b border-slate-500" style={{ top: `${(i + 1) * 12.5}%`, left: 0, right: 0 }} />
               ))}
               {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="absolute border-r border-slate-400" style={{ left: `${(i + 1) * 12.5}%`, top: 0, bottom: 0 }} />
+                <div key={`v${i}`} className="absolute border-r border-slate-500" style={{ left: `${(i + 1) * 12.5}%`, top: 0, bottom: 0 }} />
               ))}
             </div>
+
             {posicoes.length === 0 ? (
               <div className="text-center z-10">
-                <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                <p className="text-gray-400 text-sm">Nenhum veículo rastreado</p>
-                <p className="text-gray-300 text-xs mt-1">Integre um GPS tracker via API POST /api/admin/rastreamento</p>
+                <MapPin className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+                <p className="text-sm text-gray-400 font-medium">Nenhum veículo rastreado</p>
+                <p className="text-xs text-gray-300 mt-1">Integre via POST /api/admin/rastreamento</p>
               </div>
             ) : (
               <div className="absolute inset-0 flex items-center justify-center z-10">
-                <div className="grid grid-cols-3 gap-4 p-4">
+                <div className="flex flex-wrap gap-3 p-4 justify-center">
                   {posicoes.map(p => {
                     const sc = STATUS_CONFIG[p.status];
                     return (
                       <button key={p.id} onClick={() => setSelecionado(p === selecionado ? null : p)}
-                        className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all hover:scale-110 ${selecionado?.id === p.id ? 'ring-2 ring-brand-primary bg-white/80' : 'bg-white/60 hover:bg-white/80'}`}>
+                        className={`flex flex-col items-center gap-1 p-2.5 rounded-xl transition-all hover:scale-110 ${
+                          selecionado?.id === p.id ? 'ring-2 ring-brand-primary bg-white shadow-lg' : 'bg-white/70 hover:bg-white shadow-sm'
+                        }`}>
                         <div className="relative">
-                          <MapPin className={`w-8 h-8 ${p.status === 'online' ? 'text-brand-primary' : p.status === 'parado' ? 'text-yellow-500' : 'text-gray-400'}`} fill="currentColor" />
-                          <div className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${sc.dot} border-2 border-white`} />
+                          <MapPin className={`w-7 h-7 ${p.status === 'online' ? 'text-brand-primary' : p.status === 'parado' ? 'text-amber-500' : 'text-gray-400'}`} fill="currentColor" />
+                          <div className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${sc.dot} border-2 border-white ${p.status === 'online' ? 'animate-pulse' : ''}`} />
                         </div>
-                        <span className="text-xs font-bold text-gray-800">{p.veiculo_placa}</span>
+                        <span className="text-xs font-black text-gray-800">{p.veiculo_placa}</span>
                       </button>
                     );
                   })}
@@ -182,59 +174,69 @@ export default function RastreamentoPage() {
               </div>
             )}
           </div>
+
+          {/* Selected vehicle detail */}
           {selecionado && (
-            <div className="p-4 border-t border-gray-200 bg-white">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-gray-900">{selecionado.veiculo_placa}</span>
-                <button onClick={() => setSelecionado(null)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+            <div className="p-4 border-t border-gray-100 bg-white">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-black text-gray-900">{selecionado.veiculo_placa}</span>
+                <button onClick={() => setSelecionado(null)} className="p-1.5 rounded-xl hover:bg-gray-100 transition-colors">
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
               </div>
-              <div className="grid grid-cols-4 gap-3 text-sm">
-                <div><p className="text-xs text-gray-400">Velocidade</p><p className="font-semibold">{selecionado.velocidade} km/h</p></div>
-                <div><p className="text-xs text-gray-400">Odômetro</p><p className="font-semibold">{selecionado.odometro?.toLocaleString('pt-BR')} km</p></div>
-                <div><p className="text-xs text-gray-400">Ignição</p>
-                  <p className="font-semibold flex items-center gap-1">
-                    {selecionado.ignicao ? <><Zap className="w-3 h-3 text-green-500" />Ligada</> : <><ZapOff className="w-3 h-3 text-gray-400" />Desligada</>}
-                  </p>
-                </div>
-                <div><p className="text-xs text-gray-400">Coords</p>
-                  <p className="font-mono text-xs">{selecionado.lat ? `${selecionado.lat?.toFixed(4)}, ${selecionado.lng?.toFixed(4)}` : '—'}</p>
-                </div>
+              <div className="grid grid-cols-4 gap-3">
+                {[
+                  { label: 'Velocidade', value: `${selecionado.velocidade} km/h` },
+                  { label: 'Odômetro', value: `${selecionado.odometro?.toLocaleString('pt-BR')} km` },
+                  { label: 'Ignição', value: selecionado.ignicao ? 'Ligada' : 'Desligada', icon: selecionado.ignicao ? Zap : ZapOff, iconColor: selecionado.ignicao ? 'text-emerald-500' : 'text-gray-400' },
+                  { label: 'Coords', value: selecionado.lat ? `${selecionado.lat?.toFixed(3)}, ${selecionado.lng?.toFixed(3)}` : '—' },
+                ].map(item => (
+                  <div key={item.label}>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">{item.label}</p>
+                    <p className="text-xs font-bold text-gray-700 flex items-center gap-1">
+                      {'icon' in item && item.icon && <item.icon className={`w-3 h-3 ${item.iconColor}`} />}
+                      {item.value}
+                    </p>
+                  </div>
+                ))}
               </div>
-              <p className="text-xs text-gray-400 mt-2">Última atualização: {formatarTempo(selecionado.ultima_atualizacao)}</p>
+              <p className="text-[10px] text-gray-400 mt-2">Atualizado: {formatarTempo(selecionado.ultima_atualizacao)}</p>
             </div>
           )}
         </div>
 
-        {/* Lista de veículos */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
-            <span className="text-sm font-semibold text-gray-700">Veículos Monitorados</span>
+        {/* Vehicle list */}
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <p className="text-sm font-black text-gray-800">Veículos Monitorados</p>
           </div>
           {loading ? (
-            <div className="p-8 text-center text-gray-400 text-sm">Carregando...</div>
+            <div className="p-8 text-center">
+              <div className="w-6 h-6 border-2 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto" />
+            </div>
           ) : posicoes.length === 0 ? (
             <div className="p-8 text-center">
-              <WifiOff className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-gray-400 text-sm">Nenhum veículo</p>
+              <WifiOff className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+              <p className="text-xs text-gray-400 font-medium">Nenhum veículo</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto">
+            <div className="divide-y divide-gray-50 max-h-72 lg:max-h-none overflow-y-auto">
               {posicoes.map(p => {
                 const sc = STATUS_CONFIG[p.status];
                 return (
                   <button key={p.id} onClick={() => setSelecionado(p === selecionado ? null : p)}
                     className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left ${selecionado?.id === p.id ? 'bg-brand-primary/5' : ''}`}>
-                    <div className="relative flex-shrink-0">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center bg-gray-100`}>
-                        {p.status === 'online' ? <Wifi className="w-4 h-4 text-green-600" /> : <WifiOff className="w-4 h-4 text-gray-400" />}
+                    <div className="relative shrink-0">
+                      <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center">
+                        {p.status === 'online' ? <Wifi className="w-4 h-4 text-emerald-600" /> : <WifiOff className="w-4 h-4 text-gray-400" />}
                       </div>
-                      <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${sc.dot}`} />
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${sc.dot} ${p.status === 'online' ? 'animate-pulse' : ''}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900">{p.veiculo_placa}</p>
+                      <p className="text-sm font-bold text-gray-900">{p.veiculo_placa}</p>
                       <p className="text-xs text-gray-400">{p.velocidade} km/h · {formatarTempo(p.ultima_atualizacao)}</p>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sc.color}`}>{sc.label}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${sc.color}`}>{sc.label}</span>
                   </button>
                 );
               })}
@@ -243,26 +245,38 @@ export default function RastreamentoPage() {
         </div>
       </div>
 
-      {/* Integração info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <p className="text-sm font-semibold text-blue-800 mb-1">Integração com GPS Tracker</p>
-        <p className="text-xs text-blue-600">Envie dados de telemetria via <code className="bg-blue-100 px-1 rounded font-mono">POST /api/admin/rastreamento</code> com os campos: veiculo_id, lat, lng, velocidade, ignicao, odometro, status.</p>
-        <p className="text-xs text-blue-600 mt-1">Compatible com Teltonika, Suntech, Queclink, Coban e qualquer dispositivo que suporte HTTP POST.</p>
+      {/* Integration info */}
+      <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-start gap-3">
+        <Navigation className="w-4 h-4 text-brand-primary shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-bold text-blue-800 mb-1">Integração com GPS Tracker</p>
+          <p className="text-xs text-blue-600">Envie dados via <code className="bg-blue-100 px-1.5 py-0.5 rounded font-mono">POST /api/admin/rastreamento</code> com os campos: veiculo_id, lat, lng, velocidade, ignicao, odometro, status.</p>
+          <p className="text-xs text-blue-500 mt-1">Compatível com Teltonika, Suntech, Queclink, Coban e qualquer dispositivo com HTTP POST.</p>
+        </div>
       </div>
 
-      {/* Modal atualizar posição */}
+      {/* Modal / bottom sheet */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-lg font-bold text-gray-900">Atualizar Posição</h2>
-              <button onClick={() => setShowForm(false)} className="p-2 rounded-lg hover:bg-gray-100"><X className="w-5 h-5 text-gray-500" /></button>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setShowForm(false)} />
+          <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom duration-300">
+            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mt-3 mb-1 sm:hidden" />
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-brand-primary/10 rounded-xl flex items-center justify-center">
+                  <MapPin className="w-4 h-4 text-brand-primary" />
+                </div>
+                <h2 className="text-base font-bold text-gray-900">Atualizar Posição</h2>
+              </div>
+              <button onClick={() => setShowForm(false)} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-5 space-y-3.5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Veículo *</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Veículo *</label>
                 <div className="relative">
-                  <select className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm appearance-none pr-8 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+                  <select className={inputCls + ' appearance-none pr-8'}
                     value={form.veiculo_id}
                     onChange={e => { const v = veiculos.find(x => x.id === e.target.value); setForm(f => ({ ...f, veiculo_id: e.target.value, veiculo_placa: v?.placa ?? '' })); }}>
                     <option value="">Selecionar veículo...</option>
@@ -273,31 +287,31 @@ export default function RastreamentoPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Latitude</label>
-                  <input type="number" step="0.0000001" placeholder="-23.5505" className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Latitude</label>
+                  <input type="number" step="0.0000001" placeholder="-23.5505" className={inputCls}
                     value={form.lat} onChange={e => setForm(f => ({ ...f, lat: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Longitude</label>
-                  <input type="number" step="0.0000001" placeholder="-46.6333" className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Longitude</label>
+                  <input type="number" step="0.0000001" placeholder="-46.6333" className={inputCls}
                     value={form.lng} onChange={e => setForm(f => ({ ...f, lng: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Velocidade (km/h)</label>
-                  <input type="number" min="0" placeholder="0" className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Velocidade (km/h)</label>
+                  <input type="number" min="0" placeholder="0" className={inputCls}
                     value={form.velocidade} onChange={e => setForm(f => ({ ...f, velocidade: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Odômetro (km)</label>
-                  <input type="number" min="0" placeholder="0" className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Odômetro (km)</label>
+                  <input type="number" min="0" placeholder="0" className={inputCls}
                     value={form.odometro} onChange={e => setForm(f => ({ ...f, odometro: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Status</label>
                   <div className="relative">
-                    <select className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm appearance-none pr-8 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-                      value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
-                      <option value="online">Online</option>
+                    <select className={inputCls + ' appearance-none pr-8'} value={form.status}
+                      onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                      <option value="online">Em Rota</option>
                       <option value="parado">Parado</option>
                       <option value="offline">Offline</option>
                     </select>
@@ -305,10 +319,10 @@ export default function RastreamentoPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Ignição</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Ignição</label>
                   <div className="relative">
-                    <select className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm appearance-none pr-8 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-                      value={form.ignicao} onChange={e => setForm(f => ({ ...f, ignicao: e.target.value }))}>
+                    <select className={inputCls + ' appearance-none pr-8'} value={form.ignicao}
+                      onChange={e => setForm(f => ({ ...f, ignicao: e.target.value }))}>
                       <option value="true">Ligada</option>
                       <option value="false">Desligada</option>
                     </select>
@@ -317,10 +331,13 @@ export default function RastreamentoPage() {
                 </div>
               </div>
             </div>
-            <div className="flex gap-3 p-6 border-t border-gray-200">
-              <button onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors">Cancelar</button>
+            <div className="flex gap-3 p-5 border-t border-gray-100">
+              <button onClick={() => setShowForm(false)}
+                className="flex-1 py-3 rounded-2xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+                Cancelar
+              </button>
               <button onClick={salvar} disabled={salvando || !form.veiculo_id}
-                className="flex-1 py-2.5 rounded-lg bg-brand-primary text-white font-medium hover:bg-brand-primary/90 transition-colors disabled:opacity-50">
+                className="flex-1 py-3 rounded-2xl bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary/90 transition-colors disabled:opacity-50 shadow-lg shadow-brand-primary/20">
                 {salvando ? 'Salvando...' : 'Atualizar'}
               </button>
             </div>
