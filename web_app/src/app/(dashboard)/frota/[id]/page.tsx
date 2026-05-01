@@ -101,34 +101,42 @@ export default function VehicleDetailsPage({ params }: { params: Promise<{ id: s
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docForm, setDocForm] = useState({ veiculo_id: id, tipo: 'CRLV', data_vencimento: '', observacao: '', url_anexo: '' });
 
+  // Sincronização com SessionStorage para persistência entre reloads - Melhoria 5
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !globalCache[id]) {
+      const saved = sessionStorage.getItem(`cache_v_${id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Date.now() - parsed.timestamp < 1000 * 60 * 10) { // 10 min
+          setVehicle(parsed.vehicle);
+          setDocuments(parsed.documents);
+          setChecklists(parsed.checklists);
+          globalCache[id] = parsed;
+        }
+      }
+    }
+  }, [id]);
+
   const fetchData = useCallback(async (isRefresh = false) => {
     if (!isRefresh && !globalCache[id]) setLoading(true);
     
     try {
-      // Execução Paralela - Melhoria 1 (Promise.all)
-      const [resV, resD, resC] = await Promise.all([
-        fetch(`/api/admin/frota?id=${id}`),
-        fetch(`/api/admin/frota/documentos?veiculo_id=${id}`),
-        fetch(`/api/admin/frota/checklists?veiculo_id=${id}`)
-      ]);
+      // Uso de API Agregada - Melhoria 1 (Single Round Trip)
+      const res = await fetch(`/api/admin/frota/${id}/full-details`);
+      const data = await res.json();
 
-      const [dataV, dataD, dataC] = await Promise.all([
-        resV.json(),
-        resD.json(),
-        resC.json()
-      ]);
+      if (data.veiculo) {
+        const docs = data.documentos.map((d: any) => ({ ...d, status: getStatus(d.data_vencimento) }));
+        const cks = data.checklists;
 
-      if (dataV.veiculos && dataV.veiculos.length > 0) {
-        const v = dataV.veiculos[0];
-        const docs = (dataD.documentos ?? []).map((d: any) => ({ ...d, status: getStatus(d.data_vencimento) }));
-        const cks = dataC.checklists ?? [];
-
-        setVehicle(v);
+        setVehicle(data.veiculo);
         setDocuments(docs);
         setChecklists(cks);
 
-        // Atualiza Cache - Melhoria 4
-        globalCache[id] = { vehicle: v, documents: docs, checklists: cks, timestamp: Date.now() };
+        // Atualiza Caches
+        const cacheEntry = { vehicle: data.veiculo, documents: docs, checklists: cks, timestamp: Date.now() };
+        globalCache[id] = cacheEntry;
+        sessionStorage.setItem(`cache_v_${id}`, JSON.stringify(cacheEntry));
       } else {
         setError('Veículo não encontrado');
       }
