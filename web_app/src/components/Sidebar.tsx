@@ -102,7 +102,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         <div className="p-4 border-t border-sidebar-fg/10 mt-auto">
-          {user && (
+          {mounted && user && (
             <div className="px-4 py-2 mb-2">
               <p className="text-xs text-sidebar-fg/50 truncate">{user.nome || user.email}</p>
               <p className="text-xs text-brand-secondary capitalize">{user.perfil}</p>
