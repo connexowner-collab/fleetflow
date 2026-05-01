@@ -6,7 +6,7 @@ import { createClient } from '@/utils/supabase/client';
 
 interface Documento {
   id: string; veiculo_id: string; veiculo_placa?: string;
-  tipo: string; numero: string | null; data_vencimento: string | null;
+  tipo: string; numero?: string | null; data_vencimento: string | null;
   observacao: string | null; url_anexo?: string | null;
   status?: 'ok' | 'vence_em_breve' | 'vencido' | 'sem_data';
 }

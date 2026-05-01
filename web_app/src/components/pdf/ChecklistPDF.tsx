@@ -280,7 +280,7 @@ export const ChecklistPDFDoc = ({ checklist, itens, fotos }: Props) => {
           const [nome, obs] = item.nome.split(' | ');
           return (
             <View key={idx} style={styles.tableRow}>
-              <View style={[styles.checkbox, !item.conforme && { backgroundColor: '#EF4444', borderColor: '#EF4444' }]} />
+              <View style={[styles.checkbox, !item.conforme ? { backgroundColor: '#EF4444', borderColor: '#EF4444' } : {}]} />
               <Text style={styles.itemText}>{nome}</Text>
               <Text style={styles.itemObs}>{item.conforme ? 'OK' : (obs || 'FALHA')}</Text>
             </View>
