@@ -315,6 +315,7 @@ export default function ManutencaoPage() {
     <div className="flex flex-col min-h-screen bg-[#F4F6FB] pb-20">
 
       <AppHeader showActions={false} />
+      <div className="px-5 pt-5 pb-2">
         <h1 className="text-2xl font-bold text-gray-900">Manutenções</h1>
         <p className="text-gray-500 text-sm mt-0.5">Solicite e acompanhe manutenções do seu veículo.</p>
       </div>

@@ -755,7 +755,6 @@ export default function UserProfilePanel({ open, onClose }: UserProfilePanelProp
   const [view, setView] = useState<View>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-
   useEffect(() => { setMounted(true); }, []);
 
   // Carrega avatar ao abrir o painel
@@ -769,7 +768,7 @@ export default function UserProfilePanel({ open, onClose }: UserProfilePanelProp
   }, [open]);
 
   const nomeCurto   = mounted ? (user?.nome || user?.email || 'Usuário') : 'Usuário';
-  const iniciais    = nomeCurto.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
+  const iniciais    = mounted ? nomeCurto.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2) : 'U';
   const perfilLabel = mounted ? (PERFIL_LABEL[user?.perfil ?? ''] ?? (user?.perfil ?? '—')) : '—';
 
   // Fecha sub-tela ao fechar o painel

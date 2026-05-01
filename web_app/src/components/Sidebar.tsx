@@ -48,7 +48,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const allNavItems = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['gestor', 'diretor', 'analista', 'motorista'] },
     { href: '/frota', label: 'Gestão da Frota', icon: Truck, roles: ['gestor', 'diretor', 'analista'] },
-    { href: '/checklists', label: 'Checklists', icon: ClipboardCheck, roles: ['gestor', 'diretor', 'analista', 'motorista'] },
+    { href: '/checklists', label: 'Checklists', icon: ClipboardCheck, roles: ['gestor', 'diretor', 'analista'] },
     { href: '/ocorrencias', label: 'Ocorrências', icon: AlertTriangle, roles: ['gestor', 'diretor', 'analista', 'motorista'] },
     { href: '/manutencao', label: 'Manutenção', icon: Wrench, roles: ['gestor', 'diretor', 'analista'] },
     { href: '/combustivel', label: 'Combustível', icon: Fuel, roles: ['gestor', 'diretor', 'analista'] },
