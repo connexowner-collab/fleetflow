@@ -52,7 +52,6 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     { href: '/ocorrencias', label: 'Ocorrências', icon: AlertTriangle, roles: ['gestor', 'diretor', 'analista', 'motorista'] },
     { href: '/manutencao', label: 'Manutenção', icon: Wrench, roles: ['gestor', 'diretor', 'analista'] },
     { href: '/combustivel', label: 'Combustível', icon: Fuel, roles: ['gestor', 'diretor', 'analista'] },
-    { href: '/documentos', label: 'Documentos', icon: FileText, roles: ['gestor', 'diretor', 'analista'] },
     { href: '/rastreamento', label: 'Rastreamento', icon: MapPin, roles: ['gestor', 'diretor', 'analista'] },
     { href: '/relatorios', label: 'Relatórios & BI', icon: BarChart2, roles: ['gestor', 'diretor', 'analista'] },
     { href: '/notificacoes', label: 'Notificações', icon: Bell, roles: ['gestor', 'diretor', 'analista'] },
