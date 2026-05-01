@@ -105,9 +105,9 @@ export default function DocumentosPage() {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
       const filePath = `docs/${fileName}`;
-      const { error: uploadError } = await supabase.storage.from('fleetflow-storage').upload(filePath, file);
+      const { error: uploadError } = await supabase.storage.from('fleetflow-docs').upload(filePath, file);
       if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from('fleetflow-storage').getPublicUrl(filePath);
+      const { data: { publicUrl } } = supabase.storage.from('fleetflow-docs').getPublicUrl(filePath);
       setForm(f => ({ ...f, url_anexo: publicUrl }));
     } catch (err) {
       console.error(err);
