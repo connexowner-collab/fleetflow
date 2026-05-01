@@ -76,14 +76,15 @@ export async function POST(request: NextRequest) {
 
     const { error } = await supabase
       .from('veiculo_documentos')
-      .insert({
+      .upsert({
         tenant_id: userProfile.tenant_id,
         veiculo_id,
         tipo,
         data_vencimento: data_vencimento || null,
         observacao: observacao || null,
         url_anexo: url_anexo || null,
-      })
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'veiculo_id,tipo' })
 
     if (error) throw error
     return NextResponse.json({ ok: true })
