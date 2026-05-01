@@ -43,7 +43,7 @@ export default function AppLogin() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-white px-6">
+    <div className="flex flex-col h-screen overflow-y-auto bg-white px-6">
       <div className="flex flex-col items-center justify-center flex-1 gap-6">
 
         {/* Logo */}
