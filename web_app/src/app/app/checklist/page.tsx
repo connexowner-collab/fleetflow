@@ -157,7 +157,7 @@ export default function ChecklistPage() {
   // Etapa 3: inspeção + KM
   const [kmAtual,  setKmAtual]  = useState('')
   const [kmErro,   setKmErro]   = useState('')
-  const [inspecao, setInspecao] = useState<Record<string, 'ok' | 'avaria'>>({})
+  const [inspecao, setInspecao] = useState<Record<string, { conforme: boolean; observacao: string }>>({})
   const [observacao, setObservacao] = useState('')
 
   // Etapa 4: fotos
@@ -219,9 +219,9 @@ export default function ChecklistPage() {
         const itensAPI: string[] = ((await itensRes.json()).opcoes ?? []).map((o: Opcao) => o.valor)
         if (itensAPI.length > 0) {
           setItensInspecao(itensAPI)
-          setInspecao(Object.fromEntries(itensAPI.map(k => [k, 'ok' as const])))
+          setInspecao(Object.fromEntries(itensAPI.map(k => [k, { conforme: true, observacao: '' }])))
         } else {
-          setInspecao(Object.fromEntries(INSPECAO_ITENS_DEFAULT.map(k => [k, 'ok' as const])))
+          setInspecao(Object.fromEntries(INSPECAO_ITENS_DEFAULT.map(k => [k, { conforme: true, observacao: '' }])))
         }
 
         const tiposAPI: Opcao[] = (await tiposRes.json()).opcoes ?? []
@@ -272,7 +272,7 @@ export default function ChecklistPage() {
     setFotoEsq(null); setFotoEsqPreview('')
     setFotoDir(null); setFotoDirPreview('')
     setFotoErro('')
-    setInspecao(Object.fromEntries(itensInspecao.map(k => [k, 'ok' as const])))
+    setInspecao(Object.fromEntries(itensInspecao.map(k => [k, { conforme: true, observacao: '' }])))
     setObservacao(''); setAvarias([]); setAssinatura(''); setCpf(''); setCpfErro('')
   }
 
@@ -629,23 +629,38 @@ export default function ChecklistPage() {
                   {/* Itens de inspeção */}
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-5 pt-4 pb-2">Itens de Inspeção *</p>
-                    {itensInspecao.map((item, i) => (
-                      <div key={item} className={`flex items-center justify-between px-5 py-3.5 ${i > 0 ? 'border-t border-gray-50' : ''}`}>
-                        <span className="text-gray-800 text-sm font-medium">{item}</span>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setInspecao(prev => ({ ...prev, [item]: 'ok' }))}
-                            className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${inspecao[item] === 'ok' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                            OK
-                          </button>
-                          <button
-                            onClick={() => setInspecao(prev => ({ ...prev, [item]: 'avaria' }))}
-                            className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${inspecao[item] === 'avaria' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                            N/C
-                          </button>
+                    {itensInspecao.map((item, i) => {
+                      const estado = inspecao[item]
+                      const isRuim = estado?.conforme === false
+                      return (
+                        <div key={item} className={`px-5 py-3.5 ${i > 0 ? 'border-t border-gray-50' : ''}`}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-800 text-sm font-medium flex-1 pr-3">{item}</span>
+                            <div className="flex gap-2 shrink-0">
+                              <button
+                                onClick={() => setInspecao(prev => ({ ...prev, [item]: { conforme: true, observacao: '' } }))}
+                                className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${estado?.conforme === true ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                BOM
+                              </button>
+                              <button
+                                onClick={() => setInspecao(prev => ({ ...prev, [item]: { conforme: false, observacao: prev[item]?.observacao ?? '' } }))}
+                                className={`text-xs font-bold px-3 py-1.5 rounded-full transition-colors ${isRuim ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                RUIM
+                              </button>
+                            </div>
+                          </div>
+                          {isRuim && (
+                            <textarea
+                              value={estado?.observacao ?? ''}
+                              onChange={e => setInspecao(prev => ({ ...prev, [item]: { conforme: false, observacao: e.target.value } }))}
+                              rows={2}
+                              placeholder="Descreva o problema..."
+                              className="mt-2 w-full bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-gray-800 resize-none focus:outline-none focus:border-red-400"
+                            />
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
 
                   {/* Observações */}

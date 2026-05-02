@@ -578,6 +578,11 @@ function nomeExibicao(nome: string): string {
   return nome.split(' | ')[0];
 }
 
+function obsItem(nome: string): string {
+  const parts = nome.split(' | ');
+  return parts.length > 1 ? parts.slice(1).join(' | ') : '';
+}
+
 /** Deriva o label legível a partir do tipo armazenado + URL da foto */
 function fotoLabel(tipo: string, url: string): string {
   const u = url.toLowerCase();
@@ -738,7 +743,7 @@ function PanelContent({
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
             <p className="text-xs font-black text-gray-700 uppercase tracking-wider">Itens de Inspeção</p>
             {!loadingDetail && itensRegulares.length > 0 && (
-              <span className="text-[10px] text-gray-400 font-bold">{conformes} OK · {naoConformes} ⚠</span>
+              <span className="text-[10px] text-gray-400 font-bold">{conformes} BOM · {naoConformes} RUIM</span>
             )}
           </div>
           {loadingDetail ? (
@@ -749,16 +754,24 @@ function PanelContent({
             <p className="text-xs text-gray-400 text-center py-6">Nenhum item registrado.</p>
           ) : (
             <div className="divide-y divide-gray-50">
-              {itensRegulares.map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center px-4 py-2.5">
-                  <span className="text-xs text-gray-700 flex-1 pr-2">{nomeExibicao(item.nome)}</span>
-                  {item.conforme ? (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0">OK</span>
-                  ) : (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 shrink-0">N/C</span>
-                  )}
-                </div>
-              ))}
+              {itensRegulares.map((item, idx) => {
+                const obs = obsItem(item.nome);
+                return (
+                  <div key={idx} className="px-4 py-2.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-700 flex-1 pr-2">{nomeExibicao(item.nome)}</span>
+                      {item.conforme ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0">BOM</span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 shrink-0">RUIM</span>
+                      )}
+                    </div>
+                    {obs && (
+                      <p className="mt-1 text-[11px] text-red-600 bg-red-50 rounded-lg px-2 py-1">{obs}</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
