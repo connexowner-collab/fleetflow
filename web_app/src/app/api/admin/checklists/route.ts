@@ -79,8 +79,8 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Tenant não encontrado.' }, { status: 404 })
   }
 
-  const body = await request.json() as { id: string; status: string; observacao_validacao?: string }
-  const { id, status, observacao_validacao } = body
+  const body = await request.json() as { id: string; status: string; observacao_validacao?: string; motivo_recusa?: string }
+  const { id, status, observacao_validacao, motivo_recusa } = body
 
   if (!id || !status) {
     return NextResponse.json({ error: 'id e status são obrigatórios.' }, { status: 400 })
@@ -91,9 +91,13 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Status inválido.' }, { status: 400 })
   }
 
-  const update: Record<string, string> = { status }
+  const update: Record<string, unknown> = { status }
   if (status === 'Validado' && observacao_validacao?.trim()) {
     update.observacao_validacao = observacao_validacao.trim()
+  }
+  if (status === 'Recusado') {
+    update.motivo_recusa = motivo_recusa?.trim() ?? null
+    update.recusa_lida   = false   // reset flag so motorista sees the new rejection
   }
 
   const { data, error } = await supabase

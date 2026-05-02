@@ -33,7 +33,8 @@ type ChecklistDetail = {
   assinado_em: string | null;
 };
 
-type ValidarModal = { inspection: Inspection; obs: string; submitting: boolean } | null;
+type ValidarModal  = { inspection: Inspection; obs: string; submitting: boolean } | null;
+type RecusarModal  = { inspection: Inspection; motivo: string; submitting: boolean } | null;
 
 type Solicitacao = {
   id: string;
@@ -78,6 +79,7 @@ export default function ChecklistsPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('Todos');
   const [validarModal, setValidarModal] = useState<ValidarModal>(null);
+  const [recusarModal, setRecusarModal] = useState<RecusarModal>(null);
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [motoristas, setMotoristas] = useState<MotoristaDrop[]>([]);
   const [solicitarModal, setSolicitarModal] = useState<SolicitarModal>({ open: false, motorista_id: '', mensagem: '', submitting: false });
@@ -226,13 +228,29 @@ export default function ChecklistsPage() {
     } catch { showToast('⚠️ Erro ao aprovar.'); }
   };
 
-  const handleRecusar = async (inspection: Inspection) => {
+  const handleRecusar = (inspection: Inspection) => {
+    setRecusarModal({ inspection, motivo: '', submitting: false });
+  };
+
+  const submitRecusar = async () => {
+    if (!recusarModal) return;
+    const { inspection, motivo } = recusarModal;
+    setRecusarModal(m => m ? { ...m, submitting: true } : null);
     try {
-      await patchChecklist(inspection.id_real, 'Recusado');
+      const res = await fetch('/api/admin/checklists', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: inspection.id_real, status: 'Recusado', motivo_recusa: motivo.trim() }),
+      });
+      if (!res.ok) throw new Error('Erro');
       setInspections(prev => prev.map(i => i.id_real === inspection.id_real ? { ...i, status: 'Recusado' } : i));
-      setSelectedInspection(null);
-      showToast(`Checklist ${inspection.id} recusado.`);
-    } catch { showToast('⚠️ Erro ao recusar.'); }
+      setSelectedInspection(prev => prev?.id_real === inspection.id_real ? { ...prev, status: 'Recusado' } : prev);
+      setRecusarModal(null);
+      showToast(`❌ Checklist ${inspection.id} recusado.`);
+    } catch {
+      setRecusarModal(m => m ? { ...m, submitting: false } : null);
+      showToast('⚠️ Erro ao recusar.');
+    }
   };
 
   const filtered = inspections.filter(insp => {
@@ -299,6 +317,55 @@ export default function ChecklistsPage() {
               >
                 <CheckCircle2 className="w-4 h-4" />
                 {validarModal.submitting ? 'Validando...' : 'Validar e Liberar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal — Recusar com motivo */}
+      {recusarModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !recusarModal.submitting && setRecusarModal(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <XCircle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-gray-900">Recusar Checklist</h3>
+                <p className="text-sm text-gray-500 mt-0.5">{recusarModal.inspection.id} — {recusarModal.inspection.placa}</p>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Motivo da Recusa <span className="text-gray-400 normal-case">(opcional)</span>
+              </label>
+              <textarea
+                autoFocus
+                rows={3}
+                placeholder="Ex: Fotos ilegíveis, itens sem resposta, quilometragem incorreta..."
+                value={recusarModal.motivo}
+                onChange={e => setRecusarModal(m => m ? { ...m, motivo: e.target.value } : null)}
+                className="mt-1.5 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400/20 resize-none"
+              />
+              <p className="text-xs text-gray-400 mt-1">O motorista verá este motivo no aplicativo e será solicitado a refazer o checklist.</p>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setRecusarModal(null)}
+                disabled={recusarModal.submitting}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={submitRecusar}
+                disabled={recusarModal.submitting}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                <XCircle className="w-4 h-4" />
+                {recusarModal.submitting ? 'Recusando...' : 'Confirmar Recusa'}
               </button>
             </div>
           </div>

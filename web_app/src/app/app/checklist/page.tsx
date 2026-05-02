@@ -147,6 +147,14 @@ export default function ChecklistPage() {
   // Pop-up obrigatório de avaria (D-06)
   const [showPopupAvaria, setShowPopupAvaria] = useState(false)
 
+  // Notificação de checklists recusados
+  interface ChecklistRecusado {
+    id: string; codigo: string; placa: string
+    veiculo_nome: string | null; created_at: string; motivo_recusa: string | null
+  }
+  const [recusados, setRecusados]               = useState<ChecklistRecusado[]>([])
+  const [recusadoDismissing, setRecusadoDismissing] = useState(false)
+
   // Etapa 1: veículo (somente leitura)
   // Etapa 2: dados do motorista
   const [tipoChecklist, setTipoChecklist] = useState('')
@@ -241,6 +249,14 @@ export default function ChecklistPage() {
         }
       } catch { /* offline */ }
       await loadList(1, true)
+
+      // Verificar checklists recusados não lidos
+      try {
+        const rRes  = await fetch('/api/app/checklist-recusado')
+        const rJson = await rRes.json()
+        if (rJson.recusados?.length) setRecusados(rJson.recusados)
+      } catch { /* offline */ }
+
       setLoadingList(false)
     }
     init()
@@ -431,6 +447,73 @@ export default function ChecklistPage() {
             </div>
           </div>
         )}
+
+        {/* Pop-up: checklist recusado pelo gestor */}
+        {recusados.length > 0 && !emFluxo && (() => {
+          const rec = recusados[0]
+          const data = new Date(rec.created_at).toLocaleDateString('pt-BR')
+          const dismissar = async () => {
+            setRecusadoDismissing(true)
+            try { await fetch('/api/app/checklist-recusado', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: rec.id }) }) } catch {}
+            setRecusados(prev => prev.slice(1))
+            setRecusadoDismissing(false)
+          }
+          const refazer = async () => {
+            await dismissar()
+            if (ativo) iniciar()
+          }
+          return (
+            <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center p-4 backdrop-blur-sm">
+              <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden animate-in slide-in-from-bottom duration-300">
+                {/* Header vermelho */}
+                <div className="bg-red-500 px-6 pt-6 pb-5 text-white">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                      <AlertTriangle className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-red-100 uppercase tracking-widest">Checklist Recusado</p>
+                      <p className="font-bold text-lg">{rec.codigo}</p>
+                    </div>
+                  </div>
+                  <p className="text-red-100 text-sm">Realizado em {data} · {rec.placa}</p>
+                </div>
+
+                {/* Body */}
+                <div className="px-6 py-5 space-y-4">
+                  <div>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Motivo informado pelo gestor</p>
+                    <div className="bg-red-50 border border-red-100 rounded-2xl px-4 py-3">
+                      <p className="text-sm text-gray-800 leading-relaxed">
+                        {rec.motivo_recusa?.trim() || 'Nenhum motivo informado. Entre em contato com o gestor.'}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 text-center">
+                    Por favor, realize um novo checklist com os dados corretos.
+                  </p>
+                </div>
+
+                {/* Botões */}
+                <div className="px-6 pb-6 flex flex-col gap-2">
+                  <button
+                    onClick={refazer}
+                    disabled={recusadoDismissing || !ativo}
+                    className="w-full py-4 rounded-2xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 disabled:opacity-50 flex items-center justify-center gap-2">
+                    <ClipboardCheck className="w-4 h-4" />
+                    Refazer Checklist Agora
+                  </button>
+                  <button
+                    onClick={dismissar}
+                    disabled={recusadoDismissing}
+                    className="w-full py-3 rounded-2xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 disabled:opacity-50">
+                    Fechar (fazer depois)
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Pop-up obrigatório de avaria (D-06) */}
         {showPopupAvaria && (

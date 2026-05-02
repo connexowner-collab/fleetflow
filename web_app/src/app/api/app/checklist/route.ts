@@ -129,8 +129,8 @@ export async function POST(request: NextRequest) {
     } catch { /* */ }
 
     const temAvaria = avarias.length > 0
-    const temNaoConforme = itens.some(i => !i.conforme)
-    const status = temAvaria || temNaoConforme ? 'Com Pendências' : 'Aprovado'
+    // Todos os checklists nascem como Pendente — o gestor aprova ou recusa manualmente
+    const status = 'Pendente'
     const emailEnvio = String(body.email_envio ?? body.email ?? session.email)
     const tipoChecklist = String(body.tipo_checklist ?? 'Checklist')
 
