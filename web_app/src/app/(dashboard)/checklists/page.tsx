@@ -4,11 +4,34 @@ import { useState, useEffect } from 'react';
 import {
   Search, AlertTriangle, CheckCircle2, Clock, Car, User, Camera,
   ClipboardCheck, X, FileSignature, AlertOctagon, ChevronRight,
-  Plus, Send, XCircle, Users,
+  Plus, Send, XCircle, Users, FileText, ExternalLink, Loader2,
 } from 'lucide-react';
 
 type ChecklistItem = { nome: string; conforme: boolean };
 type ChecklistFoto = { tipo: string; url: string };
+
+type ChecklistDetail = {
+  id: string;
+  codigo: string;
+  codigo_sequencial: string | null;
+  motorista_nome: string;
+  placa: string;
+  veiculo_nome: string | null;
+  km_atual: number | null;
+  km_anterior: number | null;
+  status: string;
+  tipo_checklist: string | null;
+  unidade: string | null;
+  setor: string | null;
+  area: string | null;
+  observacao: string | null;
+  assinatura_base64: string | null;
+  cpf_motorista: string | null;
+  pdf_url: string | null;
+  tem_avaria: boolean;
+  created_at: string;
+  assinado_em: string | null;
+};
 
 type ValidarModal = { inspection: Inspection; obs: string; submitting: boolean } | null;
 
@@ -47,6 +70,7 @@ const FILTERS = ['Todos', 'Pendente', 'Aprovado', 'Validado', 'Com Pendências',
 export default function ChecklistsPage() {
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [selectedInspection, setSelectedInspection] = useState<Inspection | null>(null);
+  const [selectedChecklist, setSelectedChecklist] = useState<ChecklistDetail | null>(null);
   const [selectedItens, setSelectedItens] = useState<ChecklistItem[]>([]);
   const [selectedFotos, setSelectedFotos] = useState<ChecklistFoto[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -146,12 +170,14 @@ export default function ChecklistsPage() {
 
   const handleSelectInspection = async (insp: Inspection) => {
     setSelectedInspection(insp);
+    setSelectedChecklist(null);
     setSelectedItens([]); setSelectedFotos([]);
     setLoadingDetail(true);
     try {
       const res = await fetch(`/api/admin/checklists/${insp.id_real}`);
       if (!res.ok) throw new Error('Erro ao buscar detalhes');
       const json = await res.json();
+      setSelectedChecklist(json.checklist ?? null);
       setSelectedItens(json.itens ?? []);
       setSelectedFotos(json.fotos ?? []);
     } catch { /* drawer still shows */ }
@@ -221,8 +247,10 @@ export default function ChecklistsPage() {
   const avarias   = inspections.filter(i => i.tem_avaria && i.status !== 'Aprovado').length;
   const aprovados = inspections.filter(i => i.status === 'Aprovado' || i.status === 'Validado').length;
 
-  const conformes    = selectedItens.filter(i => i.conforme).length;
-  const naoConformes = selectedItens.filter(i => !i.conforme).length;
+  const itensRegulares = selectedItens.filter(i => !i.nome.startsWith('!!AVARIA!!'));
+  const itensAvaria    = selectedItens.filter(i => i.nome.startsWith('!!AVARIA!!'));
+  const conformes    = itensRegulares.filter(i => i.conforme).length;
+  const naoConformes = itensRegulares.filter(i => !i.conforme).length;
 
   return (
     <div className="max-w-5xl mx-auto space-y-5 pb-4">
@@ -234,7 +262,7 @@ export default function ChecklistsPage() {
         </div>
       )}
 
-      {/* Modal — Validar com observação (CA-28) */}
+      {/* Modal — Validar com observação */}
       {validarModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !validarModal.submitting && setValidarModal(null)} />
@@ -283,10 +311,18 @@ export default function ChecklistsPage() {
           <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm md:hidden" onClick={() => setSelectedInspection(null)} />
           <div className="fixed inset-x-0 bottom-0 z-50 md:hidden bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom">
             <PanelContent
-              insp={selectedInspection} itens={selectedItens} fotos={selectedFotos}
-              loadingDetail={loadingDetail} conformes={conformes} naoConformes={naoConformes}
+              insp={selectedInspection}
+              checklist={selectedChecklist}
+              itensRegulares={itensRegulares}
+              itensAvaria={itensAvaria}
+              fotos={selectedFotos}
+              loadingDetail={loadingDetail}
+              conformes={conformes}
+              naoConformes={naoConformes}
               onClose={() => setSelectedInspection(null)}
-              onValidar={handleValidar} onAprovar={handleAprovar} onRecusar={handleRecusar}
+              onValidar={handleValidar}
+              onAprovar={handleAprovar}
+              onRecusar={handleRecusar}
             />
           </div>
         </>
@@ -323,7 +359,7 @@ export default function ChecklistsPage() {
         </div>
       </div>
 
-      {/* Solicitações Pendentes (CA-34) */}
+      {/* Solicitações Pendentes */}
       {solicitacoes.length > 0 && (
         <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 space-y-2">
           <div className="flex items-center gap-2 mb-3">
@@ -428,14 +464,22 @@ export default function ChecklistsPage() {
         </div>
 
         {/* Desktop side panel */}
-        <div className="hidden md:block w-80 shrink-0">
+        <div className="hidden md:block w-96 shrink-0">
           {selectedInspection ? (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm sticky top-24 overflow-hidden">
               <PanelContent
-                insp={selectedInspection} itens={selectedItens} fotos={selectedFotos}
-                loadingDetail={loadingDetail} conformes={conformes} naoConformes={naoConformes}
+                insp={selectedInspection}
+                checklist={selectedChecklist}
+                itensRegulares={itensRegulares}
+                itensAvaria={itensAvaria}
+                fotos={selectedFotos}
+                loadingDetail={loadingDetail}
+                conformes={conformes}
+                naoConformes={naoConformes}
                 onClose={() => setSelectedInspection(null)}
-                onValidar={handleValidar} onAprovar={handleAprovar} onRecusar={handleRecusar}
+                onValidar={handleValidar}
+                onAprovar={handleAprovar}
+                onRecusar={handleRecusar}
               />
             </div>
           ) : (
@@ -447,7 +491,7 @@ export default function ChecklistsPage() {
         </div>
       </div>
 
-      {/* Modal — Solicitar Novo Checklist (CA-33) */}
+      {/* Modal — Solicitar Novo Checklist */}
       {solicitarModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !solicitarModal.submitting && setSolicitarModal(m => ({ ...m, open: false }))} />
@@ -524,17 +568,84 @@ export default function ChecklistsPage() {
   );
 }
 
+/* ── Helpers ─────────────────────────────────────────────────── */
+function parseAvaria(nome: string): { tipo: string; gravidade: string; descricao: string } {
+  const parts = nome.split('|');
+  return { tipo: parts[1] ?? '—', gravidade: parts[2] ?? '—', descricao: parts[3] ?? '—' };
+}
+
+function nomeExibicao(nome: string): string {
+  return nome.split(' | ')[0];
+}
+
+/** Deriva o label legível a partir do tipo armazenado + URL da foto */
+function fotoLabel(tipo: string, url: string): string {
+  const u = url.toLowerCase();
+  if (u.includes('assinatura_')) return 'Assinatura';
+  if (u.includes('avaria_'))     return 'Avaria';
+  if (u.includes('lateral_esq')) return 'Lateral Esq.';
+  if (u.includes('lateral_dir')) return 'Lateral Dir.';
+  if (tipo === 'frente'  || u.includes('foto_frente'))  return 'Frente';
+  if (tipo === 'traseira'|| u.includes('foto_tras'))     return 'Traseira';
+  // fallback capitalizado
+  return tipo.charAt(0).toUpperCase() + tipo.slice(1);
+}
+
+function isAssinatura(f: ChecklistFoto): boolean {
+  return f.url.toLowerCase().includes('assinatura_') || f.tipo === 'Assinatura';
+}
+
+function isAvaria(f: ChecklistFoto): boolean {
+  return f.url.toLowerCase().includes('avaria_') || f.tipo.toLowerCase().startsWith('avaria');
+}
+
 /* ── Detail Panel ─────────────────────────────────────────── */
-function PanelContent({ insp, itens, fotos, loadingDetail, conformes, naoConformes, onClose, onValidar, onAprovar, onRecusar }: {
-  insp: Inspection; itens: ChecklistItem[]; fotos: ChecklistFoto[];
-  loadingDetail: boolean; conformes: number; naoConformes: number;
+function PanelContent({
+  insp, checklist, itensRegulares, itensAvaria, fotos,
+  loadingDetail, conformes, naoConformes,
+  onClose, onValidar, onAprovar, onRecusar,
+}: {
+  insp: Inspection;
+  checklist: ChecklistDetail | null;
+  itensRegulares: ChecklistItem[];
+  itensAvaria: ChecklistItem[];
+  fotos: ChecklistFoto[];
+  loadingDetail: boolean;
+  conformes: number;
+  naoConformes: number;
   onClose: () => void;
-  onValidar: (i: Inspection) => void; onAprovar: (i: Inspection) => void; onRecusar: (i: Inspection) => void;
+  onValidar: (i: Inspection) => void;
+  onAprovar: (i: Inspection) => void;
+  onRecusar: (i: Inspection) => void;
 }) {
+  const [gerandoPDF, setGerandoPDF] = useState(false);
   const sc = STATUS_CFG[insp.status] ?? DEFAULT_STATUS;
   const StatusIcon = sc.icon;
+
+  // Fotos separando assinatura, avaria e normais pela URL
+  const fotoAssinatura = fotos.find(isAssinatura);
+  const assinaturaUrl  = fotoAssinatura?.url ?? null;
+  const fotosAvaria    = fotos.filter(f => !isAssinatura(f) && isAvaria(f));
+  const fotosNormais   = fotos.filter(f => !isAssinatura(f) && !isAvaria(f));
+
+  const handleGerarPDF = async () => {
+    setGerandoPDF(true);
+    try {
+      const url = `/api/admin/checklists/${insp.id_real}/pdf`;
+      window.open(url, '_blank');
+    } finally {
+      setTimeout(() => setGerandoPDF(false), 2000);
+    }
+  };
+
+  const gravBadge = (g: string) => {
+    if (g === 'Alta' || g === 'Crítica') return 'bg-red-100 text-red-700';
+    if (g === 'Média') return 'bg-amber-100 text-amber-700';
+    return 'bg-yellow-100 text-yellow-700';
+  };
+
   return (
-    <div className="flex flex-col max-h-[88vh] md:max-h-none">
+    <div className="flex flex-col max-h-[88vh] md:max-h-[82vh]">
       {/* Handle (mobile) */}
       <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mt-3 md:hidden" />
 
@@ -548,10 +659,29 @@ function PanelContent({ insp, itens, fotos, loadingDetail, conformes, naoConform
             </span>
           </div>
           <p className="font-bold text-gray-900">{insp.placa}</p>
+          {checklist?.tipo_checklist && (
+            <p className="text-xs text-gray-400 mt-0.5">{checklist.tipo_checklist}</p>
+          )}
         </div>
-        <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
-          <X className="w-4 h-4 text-gray-400" />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Botão PDF */}
+          <button
+            onClick={handleGerarPDF}
+            disabled={gerandoPDF}
+            title="Abrir PDF"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-colors disabled:opacity-50"
+          >
+            {gerandoPDF ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <FileText className="w-3.5 h-3.5" />
+            )}
+            PDF
+          </button>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
+            <X className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
       </div>
 
       {/* Content — scrollable */}
@@ -571,6 +701,30 @@ function PanelContent({ insp, itens, fotos, loadingDetail, conformes, naoConform
           ))}
         </div>
 
+        {/* Dados extras (unidade/setor/área) */}
+        {checklist && (checklist.unidade || checklist.setor || checklist.area) && (
+          <div className="grid grid-cols-3 gap-2">
+            {checklist.unidade && (
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Unidade</p>
+                <p className="text-xs font-bold text-gray-800">{checklist.unidade}</p>
+              </div>
+            )}
+            {checklist.setor && (
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Setor</p>
+                <p className="text-xs font-bold text-gray-800">{checklist.setor}</p>
+              </div>
+            )}
+            {checklist.area && (
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Área</p>
+                <p className="text-xs font-bold text-gray-800">{checklist.area}</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Avaria badge */}
         {insp.tem_avaria && (
           <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">
@@ -579,11 +733,11 @@ function PanelContent({ insp, itens, fotos, loadingDetail, conformes, naoConform
           </div>
         )}
 
-        {/* Itens de inspeção */}
+        {/* Itens de inspeção regulares */}
         <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
             <p className="text-xs font-black text-gray-700 uppercase tracking-wider">Itens de Inspeção</p>
-            {!loadingDetail && itens.length > 0 && (
+            {!loadingDetail && itensRegulares.length > 0 && (
               <span className="text-[10px] text-gray-400 font-bold">{conformes} OK · {naoConformes} ⚠</span>
             )}
           </div>
@@ -591,17 +745,17 @@ function PanelContent({ insp, itens, fotos, loadingDetail, conformes, naoConform
             <div className="p-4 space-y-2">
               {[1,2,3].map(i => <div key={i} className="h-7 bg-gray-100 rounded-lg animate-pulse" />)}
             </div>
-          ) : itens.length === 0 ? (
+          ) : itensRegulares.length === 0 ? (
             <p className="text-xs text-gray-400 text-center py-6">Nenhum item registrado.</p>
           ) : (
             <div className="divide-y divide-gray-50">
-              {itens.map((item, idx) => (
+              {itensRegulares.map((item, idx) => (
                 <div key={idx} className="flex justify-between items-center px-4 py-2.5">
-                  <span className="text-xs text-gray-700">{item.nome}</span>
+                  <span className="text-xs text-gray-700 flex-1 pr-2">{nomeExibicao(item.nome)}</span>
                   {item.conforme ? (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">OK</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0">OK</span>
                   ) : (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">Avaria</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 shrink-0">N/C</span>
                   )}
                 </div>
               ))}
@@ -609,46 +763,126 @@ function PanelContent({ insp, itens, fotos, loadingDetail, conformes, naoConform
           )}
         </div>
 
-        {/* Fotos */}
-        <div>
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <Camera className="w-3.5 h-3.5" />Evidências
-          </p>
-          {loadingDetail ? (
-            <div className="grid grid-cols-2 gap-2">
-              {[1,2].map(i => <div key={i} className="aspect-video bg-gray-100 rounded-xl animate-pulse" />)}
+        {/* Avarias detalhadas */}
+        {!loadingDetail && itensAvaria.length > 0 && (
+          <div className="bg-white border border-red-100 rounded-2xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-red-50 bg-red-50/50">
+              <p className="text-xs font-black text-red-700 uppercase tracking-wider flex items-center gap-1.5">
+                <AlertOctagon className="w-3.5 h-3.5" />
+                Avarias Reportadas ({itensAvaria.length})
+              </p>
             </div>
-          ) : fotos.length > 0 ? (
+            <div className="divide-y divide-gray-50">
+              {itensAvaria.map((item, idx) => {
+                const { tipo, gravidade, descricao } = parseAvaria(item.nome);
+                return (
+                  <div key={idx} className="px-4 py-3 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-gray-900">{tipo}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${gravBadge(gravidade)}`}>
+                        {gravidade}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 leading-relaxed">{descricao}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Observações gerais */}
+        {checklist?.observacao && (
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3">
+            <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider mb-1">Observações</p>
+            <p className="text-xs text-gray-700 leading-relaxed">{checklist.observacao}</p>
+          </div>
+        )}
+
+        {/* Fotos do veículo */}
+        {!loadingDetail && fotosNormais.length > 0 && (
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Camera className="w-3.5 h-3.5" />Fotos do Veículo
+            </p>
             <div className="grid grid-cols-2 gap-2">
-              {fotos.map((foto, idx) => (
+              {fotosNormais.map((foto, idx) => (
                 <a key={idx} href={foto.url} target="_blank" rel="noopener noreferrer"
                   className="aspect-video rounded-xl overflow-hidden border border-gray-100 relative group">
-                  <img src={foto.url} alt={foto.tipo} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  <img src={foto.url} alt={fotoLabel(foto.tipo, foto.url)} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                   <div className="absolute inset-x-0 bottom-0 bg-black/50 px-2 py-1">
-                    <p className="text-white text-[9px] font-bold uppercase text-center">{foto.tipo}</p>
+                    <p className="text-white text-[9px] font-bold uppercase text-center">{fotoLabel(foto.tipo, foto.url)}</p>
                   </div>
                 </a>
               ))}
             </div>
-          ) : (
+          </div>
+        )}
+
+        {/* Fotos de avaria */}
+        {!loadingDetail && fotosAvaria.length > 0 && (
+          <div>
+            <p className="text-[10px] font-black text-red-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5" />Fotos de Avaria
+            </p>
             <div className="grid grid-cols-2 gap-2">
-              {['Dianteira','Traseira'].map(l => (
-                <div key={l} className="aspect-video bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center">
-                  <Camera className="w-5 h-5 text-gray-200 mb-1" />
-                  <span className="text-[10px] text-gray-300 font-bold uppercase">{l}</span>
-                </div>
+              {fotosAvaria.map((foto, idx) => (
+                <a key={idx} href={foto.url} target="_blank" rel="noopener noreferrer"
+                  className="aspect-video rounded-xl overflow-hidden border border-red-100 relative group">
+                  <img src={foto.url} alt={fotoLabel(foto.tipo, foto.url)} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  <div className="absolute inset-x-0 bottom-0 bg-red-900/60 px-2 py-1">
+                    <p className="text-white text-[9px] font-bold uppercase text-center">{fotoLabel(foto.tipo, foto.url)}</p>
+                  </div>
+                </a>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Assinatura */}
-        <div className="border-2 border-dashed border-gray-200 rounded-2xl p-4 text-center">
-          <FileSignature className="w-5 h-5 text-gray-300 mx-auto mb-2" />
-          <p className="font-serif italic font-black text-gray-700 underline decoration-brand-primary/40 decoration-2 underline-offset-4">
-            {insp.motorista}
-          </p>
-          <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mt-2">Assinatura Digital</p>
+        {/* Loading fotos */}
+        {loadingDetail && (
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Camera className="w-3.5 h-3.5" />Evidências
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {[1,2].map(i => <div key={i} className="aspect-video bg-gray-100 rounded-xl animate-pulse" />)}
+            </div>
+          </div>
+        )}
+
+        {/* Assinatura digital */}
+        <div className="border border-gray-100 rounded-2xl overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-gray-50">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+              <FileSignature className="w-3.5 h-3.5" />Assinatura Digital
+            </p>
+          </div>
+          <div className="p-4 flex flex-col items-center gap-2">
+            {loadingDetail ? (
+              <div className="w-full h-16 bg-gray-100 rounded-xl animate-pulse" />
+            ) : assinaturaUrl ? (
+              <img
+                src={assinaturaUrl}
+                alt="Assinatura do motorista"
+                className="max-h-20 object-contain"
+              />
+            ) : checklist?.assinatura_base64 ? (
+              <img
+                src={checklist.assinatura_base64}
+                alt="Assinatura do motorista"
+                className="max-h-20 object-contain"
+              />
+            ) : (
+              <p className="font-serif italic font-black text-gray-700 underline decoration-brand-primary/40 decoration-2 underline-offset-4 text-lg">
+                {insp.motorista}
+              </p>
+            )}
+            <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">{insp.motorista}</p>
+            {checklist?.cpf_motorista && (
+              <p className="text-[10px] text-gray-400">CPF: {checklist.cpf_motorista}</p>
+            )}
+          </div>
         </div>
       </div>
 

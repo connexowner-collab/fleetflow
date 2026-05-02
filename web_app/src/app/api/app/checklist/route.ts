@@ -81,10 +81,11 @@ export async function POST(request: NextRequest) {
     const fEsq    = formData.get('foto_lateral_esq')
     const fDir    = formData.get('foto_lateral_dir')
 
-    if (fFrente instanceof Blob) files.push({ name: 'foto_frente', file: fFrente, type: 'Frente' })
-    if (fTras   instanceof Blob) files.push({ name: 'foto_tras',   file: fTras,   type: 'Traseira' })
-    if (fEsq    instanceof Blob) files.push({ name: 'foto_lateral_esq', file: fEsq, type: 'Lateral Esquerda' })
-    if (fDir    instanceof Blob) files.push({ name: 'foto_lateral_dir', file: fDir, type: 'Lateral Direita' })
+    // tipos mapeados para valores aceitos pela constraint do banco
+    if (fFrente instanceof Blob) files.push({ name: 'foto_frente',       file: fFrente, type: 'frente' })
+    if (fTras   instanceof Blob) files.push({ name: 'foto_tras',         file: fTras,   type: 'traseira' })
+    if (fEsq    instanceof Blob) files.push({ name: 'foto_lateral_esq',  file: fEsq,    type: 'extra' })
+    if (fDir    instanceof Blob) files.push({ name: 'foto_lateral_dir',  file: fDir,    type: 'extra' })
 
     // Coletar fotos de avarias
     const avarias: Array<{ descricao: string; tipo: string; gravidade: string; foto?: File }> = []
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
           foto:      fotoAvaria instanceof File ? fotoAvaria : undefined
         })
         if (fotoAvaria instanceof Blob) {
-          files.push({ name: `avaria_${i}`, file: fotoAvaria, type: `Avaria: ${formData.get(`avaria_${i}_tipo`)}` })
+          files.push({ name: `avaria_${i}`, file: fotoAvaria, type: 'extra' })
         }
         i++
       }
@@ -234,10 +235,10 @@ export async function POST(request: NextRequest) {
             // Adicionar assinatura à galeria de fotos
             await adminSupabase.from('checklist_fotos').insert({
               checklist_id: checklist.id,
-              tipo: 'Assinatura',
+              tipo: 'extra',  // 'extra' = tipo válido; label detectado pela URL (assinatura_)
               url: urlData.publicUrl
             })
-            fotosFinal.push({ tipo: 'Assinatura', url: urlData.publicUrl })
+            fotosFinal.push({ tipo: 'extra', url: urlData.publicUrl })
             console.log('[Signature] Salva como imagem:', urlData.publicUrl)
           }
         }

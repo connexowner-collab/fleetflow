@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getSessionFromRequest } from '@/utils/session'
 
-// GET /api/admin/checklists/[id]  → returns itens + fotos
+// GET /api/admin/checklists/[id]  → returns checklist + itens + fotos
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -29,7 +29,15 @@ export async function GET(
 
   const { id } = await params
 
-  const [itensRes, fotosRes] = await Promise.all([
+  const [checklistRes, itensRes, fotosRes] = await Promise.all([
+    supabase
+      .from('checklists')
+      .select(
+        'id, codigo, codigo_sequencial, motorista_nome, placa, veiculo_nome, km_atual, km_anterior, status, tipo_checklist, unidade, setor, area, observacao, assinatura_base64, cpf_motorista, pdf_url, tem_avaria, created_at, assinado_em'
+      )
+      .eq('id', id)
+      .eq('tenant_id', profile.tenant_id)
+      .single(),
     supabase
       .from('checklist_itens')
       .select('nome, conforme')
@@ -41,6 +49,7 @@ export async function GET(
   ])
 
   return NextResponse.json({
+    checklist: checklistRes.data ?? null,
     itens: itensRes.data ?? [],
     fotos: fotosRes.data ?? [],
   })

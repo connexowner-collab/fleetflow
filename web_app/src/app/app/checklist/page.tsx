@@ -902,16 +902,7 @@ export default function ChecklistPage() {
                       <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${badge.cls}`}>
                         {badge.label}
                       </span>
-                      {ck.pdf_url ? (
-                        <a href={ck.pdf_url} target="_blank" rel="noopener noreferrer"
-                           className="p-1.5 bg-indigo-50 rounded-lg" title="Abrir PDF">
-                          <ExternalLink className="w-3.5 h-3.5 text-indigo-600" />
-                        </a>
-                      ) : (
-                        <button disabled className="p-1.5 bg-gray-100 rounded-lg opacity-40 cursor-not-allowed" title="PDF não disponível">
-                          <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
-                        </button>
-                      )}
+                      <PDFButton checklistId={ck.id} pdfUrl={ck.pdf_url ?? null} />
                     </div>
                   </div>
                 )
@@ -932,5 +923,48 @@ export default function ChecklistPage() {
 
       <BottomNav />
     </div>
+  )
+}
+
+/* ── Botão PDF inteligente: abre se já tiver url, gera se não tiver ── */
+function PDFButton({ checklistId, pdfUrl }: { checklistId: string; pdfUrl: string | null }) {
+  const [gerando, setGerando] = useState(false)
+
+  const handleClick = async () => {
+    if (pdfUrl) {
+      window.open(pdfUrl, '_blank')
+      return
+    }
+    setGerando(true)
+    try {
+      // Usa a rota do admin que gera e salva o PDF
+      const res = await fetch(`/api/app/checklist/${checklistId}/pdf`)
+      if (res.ok && res.redirected) {
+        window.open(res.url, '_blank')
+      } else if (res.ok) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        window.open(url, '_blank')
+      }
+    } catch { /* falha silenciosa */ }
+    finally { setGerando(false) }
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={gerando}
+      title={pdfUrl ? 'Abrir PDF' : 'Gerar PDF'}
+      className={`p-1.5 rounded-lg transition-colors ${
+        pdfUrl
+          ? 'bg-indigo-50 hover:bg-indigo-100'
+          : 'bg-gray-50 hover:bg-gray-100'
+      } disabled:opacity-40`}
+    >
+      {gerando
+        ? <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+        : <ExternalLink className={`w-3.5 h-3.5 ${pdfUrl ? 'text-indigo-600' : 'text-gray-400'}`} />
+      }
+    </button>
   )
 }

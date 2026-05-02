@@ -34,13 +34,14 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
+    "pg": "^8.20.0",
     "tailwindcss": "^4",
-    "@types/web-push": "^3.6.4",
     "ts-jest": "^29.4.9",
     "typescript": "^5"
   }
