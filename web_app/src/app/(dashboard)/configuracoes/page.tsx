@@ -245,19 +245,16 @@ export default function ConfiguracoesPage() {
   }, []);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500">
+    <div className="max-w-5xl mx-auto space-y-5 pb-4">
       {toast && (
-        <div className="fixed top-6 right-6 z-50 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-medium animate-in slide-in-from-right">
+        <div className="fixed top-20 right-4 z-50 bg-gray-900 text-white px-4 py-3 rounded-2xl shadow-2xl text-sm font-medium animate-in slide-in-from-right">
           {toast}
         </div>
       )}
 
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
-          <Settings className="w-8 h-8 text-brand-primary" />
-          Configurações
-        </h1>
-        <p className="text-gray-500 mt-1">Gerencie empresa, dropdowns do checklist e preferências da plataforma.</p>
+        <h1 className="text-2xl font-black text-gray-900 tracking-tight">Configurações</h1>
+        <p className="text-sm text-gray-400 mt-0.5">Gerencie empresa, dropdowns do checklist e preferências da plataforma.</p>
       </div>
 
       {/* Tabs */}
